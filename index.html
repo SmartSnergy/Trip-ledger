@@ -643,7 +643,10 @@ function showScreen(id){
 }
 
 // ── Subscription helpers ──────────────────────────────────────────────────────
+const ADMIN_EMAILS = ["joshjohnson113@hotmail.com"];
+
 async function fetchSubscription(){
+  if(ADMIN_EMAILS.includes(currentUser.email)) return { status:"active", plan:"admin", periodEnd: new Date("2099-01-01") };
   const { data, error } = await sbClient.from("subscriptions").select("*").eq("user_id",currentUser.id).maybeSingle();
   if(error) throw error;
   if(!data) return { status:"expired" }; // trigger hasn't fired yet — shouldn't happen
