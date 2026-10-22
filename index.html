@@ -1,0 +1,1429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trip Ledger</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#F7F5F0; --ink:#24231F; --ink-soft:#5B584F; --line:#DAD5C8;
+    --pine:#355E3B; --pine-soft:#E3ECE2;
+    --amber:#B8863B; --amber-soft:#F3E8D4;
+    --slate:#4C6785; --slate-soft:#E3E9EF;
+    --clay:#A6452D; --clay-soft:#F1E0DA;
+    --stone:#8C8375; --stone-soft:#EAE6DD;
+    --shadow: 0 10px 24px rgba(36,35,31,0.14);
+  }
+  *{box-sizing:border-box;}
+  body{ margin:0; background:var(--paper); font-family:'IBM Plex Sans',sans-serif; color:var(--ink); padding:0 0 60px; }
+  h1{ font-family:'IBM Plex Mono',monospace; font-size:20px; font-weight:600; margin:0 0 4px; }
+  .sub{ color:var(--ink-soft); font-size:13px; margin:0 0 18px; max-width:560px; line-height:1.5; }
+  .wrap{ padding:26px 20px 0; max-width:960px; margin:0 auto; }
+
+  /* ── Screens ── */
+  .screen{ display:none; }
+  .screen.active{ display:block; }
+
+  /* ── Centred card (shared by config, auth, paywall) ── */
+  .card-wrap{ min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; }
+  .card{
+    background:#fff; border:1px solid var(--line); border-radius:8px;
+    padding:32px 28px; width:100%; max-width:420px;
+  }
+  .card h1{ font-size:22px; margin-bottom:6px; }
+  .card .tagline{ font-size:13px; color:var(--ink-soft); margin-bottom:24px; line-height:1.5; }
+  .f-label{ font-size:11px; color:var(--ink-soft); display:block; margin:14px 0 4px; text-transform:uppercase; letter-spacing:.03em; }
+  .f-input{
+    width:100%; font-family:'IBM Plex Sans',sans-serif; font-size:13px; padding:9px 10px;
+    border:1px solid var(--line); border-radius:4px; background:#fff; color:var(--ink);
+  }
+  .f-input:focus{ outline:none; border-color:var(--pine); }
+  .f-error{ font-size:12px; color:var(--clay); margin-top:10px; min-height:16px; }
+  .f-btn{
+    width:100%; margin-top:16px; font-family:'IBM Plex Mono',monospace; font-size:13px; font-weight:600;
+    background:var(--pine); color:#fff; border:none; border-radius:4px; padding:12px;
+    cursor:pointer;
+  }
+  .f-btn:hover{ background:#2a4a2f; }
+  .f-btn:disabled{ opacity:.6; cursor:default; }
+  .f-link{ font-size:12px; color:var(--ink-soft); background:none; border:none; cursor:pointer; padding:0; text-decoration:underline; margin-top:10px; }
+  .f-link:hover{ color:var(--ink); }
+  details{ margin-top:18px; }
+  summary{ font-size:12px; color:var(--ink-soft); cursor:pointer; user-select:none; }
+  .hint-body{ font-size:12px; color:var(--ink-soft); margin-top:8px; line-height:1.6; }
+  .hint-body a{ color:var(--pine); }
+
+  /* ── Auth screen tabs ── */
+  .auth-mode{ display:flex; gap:0; margin-bottom:20px; border:1px solid var(--line); border-radius:4px; overflow:hidden; }
+  .auth-mode button{
+    flex:1; font-family:'IBM Plex Mono',monospace; font-size:11.5px; padding:9px 6px;
+    border:none; background:#fff; color:var(--ink-soft); cursor:pointer;
+  }
+  .auth-mode button.active{ background:var(--pine); color:#fff; font-weight:600; }
+
+  /* ── Paywall screen ── */
+  .plan-grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:20px 0; }
+  .plan-card{
+    border:1.5px solid var(--line); border-radius:6px; padding:16px; text-align:center;
+    cursor:pointer; transition:border-color .15s ease, box-shadow .15s ease;
+  }
+  .plan-card:hover{ border-color:var(--pine); box-shadow:var(--shadow); }
+  .plan-card.featured{ border-color:var(--pine); background:var(--pine-soft); }
+  .plan-name{ font-family:'IBM Plex Mono',monospace; font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-soft); margin-bottom:8px; }
+  .plan-price{ font-family:'IBM Plex Mono',monospace; font-size:22px; font-weight:600; margin-bottom:4px; }
+  .plan-sub{ font-size:11px; color:var(--ink-soft); }
+  .plan-badge{ font-size:10px; background:var(--pine); color:#fff; border-radius:2px; padding:2px 6px; display:inline-block; margin-top:6px; }
+  .plan-btn{
+    width:100%; margin-top:14px; font-family:'IBM Plex Mono',monospace; font-size:12px; font-weight:600;
+    background:var(--pine); color:#fff; border:none; border-radius:4px; padding:10px;
+    cursor:pointer;
+  }
+  .plan-btn:hover{ background:#2a4a2f; }
+  .paywall-note{ font-size:12px; color:var(--ink-soft); text-align:center; margin-top:16px; }
+  .paywall-note button{ font-size:12px; color:var(--pine); background:none; border:none; cursor:pointer; text-decoration:underline; }
+
+  /* ── Trial banner ── */
+  .trial-banner{
+    display:flex; align-items:center; gap:10px; font-size:12px;
+    background:var(--amber-soft); border:1px solid var(--amber); border-radius:4px;
+    padding:8px 12px; margin-bottom:16px; color:#7a5a1f;
+  }
+  .trial-banner button{
+    font-family:'IBM Plex Mono',monospace; font-size:11px; background:none;
+    border:1px solid var(--amber); color:#7a5a1f; border-radius:3px; padding:3px 9px;
+    cursor:pointer; margin-left:auto; flex:none;
+  }
+
+  /* ── User menu ── */
+  .user-menu-wrap{ position:relative; margin-left:auto; }
+  .user-btn{
+    font-family:'IBM Plex Mono',monospace; font-size:11px; background:none; border:1px solid var(--line);
+    color:var(--ink-soft); border-radius:4px; padding:6px 12px; cursor:pointer; max-width:180px;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .user-btn:hover{ border-color:var(--ink-soft); color:var(--ink); }
+  .user-dropdown{
+    position:absolute; right:0; top:calc(100% + 4px); background:#fff; border:1px solid var(--line);
+    border-radius:5px; box-shadow:var(--shadow); min-width:180px; z-index:20;
+    display:none; flex-direction:column; overflow:hidden;
+  }
+  .user-dropdown.open{ display:flex; }
+  .user-dropdown button{
+    font-family:'IBM Plex Sans',sans-serif; font-size:13px; background:none; border:none;
+    padding:11px 16px; cursor:pointer; text-align:left; color:var(--ink);
+  }
+  .user-dropdown button:hover{ background:var(--stone-soft); }
+  .user-dropdown button.danger{ color:var(--clay); }
+
+  /* ── Trips screen ── */
+  .trips-header{ display:flex; align-items:center; justify-content:space-between; margin-bottom:22px; }
+  .trip-card{
+    background:#fff; border:1px solid var(--line); border-radius:6px; padding:16px 18px;
+    margin-bottom:10px; display:flex; align-items:center; gap:14px;
+    transition:box-shadow .15s ease;
+  }
+  .trip-card:hover{ box-shadow:var(--shadow); }
+  .trip-card-info{ flex:1; }
+  .trip-card-name{ font-weight:700; font-size:15px; margin-bottom:3px; }
+  .trip-card-dates{ font-size:12px; color:var(--ink-soft); }
+  .trip-card-open{
+    font-family:'IBM Plex Mono',monospace; font-size:11.5px; font-weight:600;
+    background:var(--pine-soft); color:var(--pine); border:1px solid var(--pine);
+    border-radius:4px; padding:7px 14px; cursor:pointer; white-space:nowrap; flex:none;
+  }
+  .trip-card-del{ font-size:12px; color:var(--clay); background:none; border:none; cursor:pointer; padding:6px 4px; flex:none; }
+  .new-trip-form{
+    background:#fff; border:1px solid var(--line); border-radius:6px; padding:18px;
+    margin-bottom:12px;
+  }
+  .nt-row{ display:flex; flex-wrap:wrap; gap:8px; align-items:flex-end; margin-top:10px; }
+  .nt-row input[type=text], .nt-row input[type=date]{
+    font-family:'IBM Plex Sans',sans-serif; font-size:13px; padding:8px 9px;
+    border:1px solid var(--line); border-radius:4px; background:#fff; color:var(--ink);
+  }
+  .nt-row input[type=text]{ flex:1; min-width:160px; }
+  .trips-empty{ font-size:13px; color:var(--ink-soft); padding:24px; border:1px dashed var(--line); border-radius:6px; text-align:center; }
+
+  /* ── App screen topbar ── */
+  .app-topbar{ display:flex; align-items:center; gap:12px; margin-bottom:18px; }
+  .back-btn{
+    font-family:'IBM Plex Mono',monospace; font-size:11.5px; background:none; border:1px solid var(--line);
+    color:var(--ink-soft); border-radius:4px; padding:6px 12px; cursor:pointer; flex:none;
+  }
+  .back-btn:hover{ border-color:var(--ink-soft); color:var(--ink); }
+
+  /* ── Tabs ── */
+  .tabs{ display:flex; gap:4px; border-bottom:1px solid var(--line); margin-bottom:22px; }
+  .tab{
+    font-family:'IBM Plex Mono',monospace; font-size:12px; letter-spacing:.02em;
+    padding:9px 14px; cursor:pointer; color:var(--ink-soft); border-bottom:2px solid transparent;
+    background:none; border-top:none; border-left:none; border-right:none;
+  }
+  .tab.active{ color:var(--ink); border-bottom-color:var(--pine); font-weight:600; }
+  .view{ display:none; }
+  .view.active{ display:block; }
+
+  /* ── Toolbar ── */
+  .receipts-toolbar{ display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:20px; }
+  .add-btn{
+    flex:none; font-family:'IBM Plex Mono',monospace; font-size:12px; font-weight:600;
+    background:var(--pine); color:#fff; border:none; border-radius:4px; padding:10px 16px;
+    cursor:pointer; white-space:nowrap;
+  }
+  .add-btn:hover{ background:#2a4a2f; }
+  .add-btn.ghost{ background:none; border:1px solid var(--line); color:var(--ink-soft); }
+  .add-btn.ghost:hover{ border-color:var(--ink-soft); color:var(--ink); }
+  .add-btn.danger{ background:none; border:1px solid var(--clay); color:var(--clay); }
+  .add-btn.danger:hover{ background:var(--clay-soft); }
+
+  /* ── Calendar ── */
+  .calendar{ display:flex; gap:6px; overflow-x:auto; padding-bottom:4px; flex:1; }
+  .day{ flex:none; width:64px; border:1px solid var(--line); background:#fff; border-radius:4px; padding:8px 6px; text-align:center; cursor:pointer; }
+  .day.active{ border-color:var(--pine); background:var(--pine-soft); }
+  .day .dow{ font-size:9.5px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.04em; }
+  .day .num{ font-family:'IBM Plex Mono',monospace; font-size:16px; font-weight:600; margin:2px 0; }
+  .day .cnt{ font-size:9.5px; color:var(--ink-soft); }
+  .day .cnt.has{ color:var(--pine); font-weight:600; }
+
+  /* ── Receipt grid ── */
+  .grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(190px,1fr)); gap:22px 18px; }
+  .receipt{
+    position:relative; background:#fff; border:1px solid var(--line); padding:16px 15px 20px; cursor:pointer;
+    transition:transform .15s ease, box-shadow .15s ease;
+    clip-path: polygon(0% 0%, 100% 0%, 100% 96%, 95% 100%, 90% 96%, 85% 100%, 80% 96%, 75% 100%, 70% 96%, 65% 100%, 60% 96%, 55% 100%, 50% 96%, 45% 100%, 40% 96%, 35% 100%, 30% 96%, 25% 100%, 20% 96%, 15% 100%, 10% 96%, 5% 100%, 0% 96%);
+  }
+  .receipt:nth-child(3n+1){ transform:rotate(-0.6deg); }
+  .receipt:nth-child(3n+2){ transform:rotate(0.5deg); }
+  .receipt:nth-child(3n+3){ transform:rotate(-0.3deg); }
+  .receipt:hover{ transform:translateY(-3px) rotate(0deg); box-shadow:var(--shadow); z-index:2; }
+  .receipt .rid{ font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--ink-soft); }
+  .receipt .store{ font-weight:600; font-size:14.5px; margin:3px 0 2px; }
+  .receipt .date{ font-size:11.5px; color:var(--ink-soft); margin-bottom:2px; }
+  .receipt .date.unassigned{ color:var(--clay); font-weight:600; }
+  .receipt .buyer{ font-size:11px; color:var(--pine); margin-bottom:10px; min-height:14px; }
+  .receipt .total{ font-family:'IBM Plex Mono',monospace; font-size:22px; font-weight:600; margin-bottom:10px; }
+  .breakdown{ display:flex; flex-direction:column; gap:3px; margin-bottom:10px; }
+  .breakdown .brow{ display:flex; justify-content:space-between; font-size:11px; }
+  .breakdown .brow .lbl{ display:flex; align-items:center; gap:5px; color:var(--ink-soft); }
+  .breakdown .brow .swatch{ width:7px; height:7px; border-radius:2px; flex:none; }
+  .breakdown .brow .amt{ font-family:'IBM Plex Mono',monospace; }
+  .swatch.Consumables{ background:var(--slate); } .swatch.House-Supplies{ background:var(--stone); }
+  .swatch.Veggies{ background:var(--pine); } .swatch.Meat{ background:var(--clay); } .swatch.Alcohol{ background:var(--amber); }
+  .claim-status{ font-size:11px; display:flex; align-items:center; gap:5px; color:var(--ink-soft); }
+  .dot{ width:7px; height:7px; border-radius:50%; background:var(--line); flex:none; }
+  .dot.done{ background:var(--pine); } .dot.partial{ background:var(--amber); }
+
+  /* ── Side panel ── */
+  .overlay{ position:fixed; inset:0; background:rgba(36,35,31,0.35); opacity:0; pointer-events:none; transition:opacity .2s ease; z-index:10; }
+  .overlay.open{ opacity:1; pointer-events:auto; }
+  .panel{
+    position:fixed; top:0; right:0; height:100%; width:min(440px, 92vw); background:var(--paper);
+    border-left:1px solid var(--line); transform:translateX(100%); transition:transform .25s ease;
+    z-index:11; display:flex; flex-direction:column; box-shadow:-12px 0 30px rgba(0,0,0,0.12);
+  }
+  .panel.open{ transform:translateX(0); }
+  .panel-head{ padding:20px 22px 14px; border-bottom:1px solid var(--line); background:#fff; position:relative; }
+  .panel-head .rid{ font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--ink-soft); }
+  .panel-head .store{ font-size:17px; font-weight:700; margin:2px 0 2px; }
+  .panel-head .meta{ font-size:12px; color:var(--ink-soft); margin-bottom:12px; }
+  .field-row{ display:flex; gap:8px; align-items:center; margin-bottom:8px; }
+  .field-row label{ font-size:11px; color:var(--ink-soft); width:64px; flex:none; }
+  .field-row select, .field-row input{ font-family:'IBM Plex Sans',sans-serif; font-size:12.5px; padding:6px 8px; border:1px solid var(--line); border-radius:3px; background:#fff; color:var(--ink); flex:1; }
+  .field-row.needs-date input{ border-color:var(--clay); background:var(--clay-soft); }
+  .close-btn{ position:absolute; top:16px; right:18px; background:none; border:none; font-size:20px; cursor:pointer; color:var(--ink-soft); }
+  .panel-body{ flex:1; overflow-y:auto; padding:6px 0; }
+  .item-row{ display:grid; grid-template-columns:1fr auto; align-items:center; padding:11px 22px; border-bottom:1px solid var(--line); gap:8px; }
+  .item-row .name{ font-size:13.5px; }
+  .item-row .cat{ font-size:10.5px; color:var(--ink-soft); margin-top:2px; }
+  .item-row .price{ font-family:'IBM Plex Mono',monospace; font-size:13.5px; text-align:right; }
+  .claim-row{ grid-column:1/-1; display:flex; align-items:center; gap:8px; margin-top:6px; }
+  .claim-row select, .claim-row input{ font-family:'IBM Plex Sans',sans-serif; font-size:12.5px; padding:6px 8px; border:1px solid var(--line); border-radius:3px; background:#fff; color:var(--ink); }
+  .claim-row select{ flex:1.3; } .claim-row input{ width:78px; }
+  .claim-row .claimed-tag{ font-size:11px; color:var(--pine); font-weight:600; display:none; }
+  .claim-row.is-claimed .claimed-tag{ display:inline; }
+  .claim-row.is-claimed select, .claim-row.is-claimed input{ border-color:var(--pine); background:var(--pine-soft); }
+  .panel-foot{ padding:16px 22px; border-top:1px solid var(--line); background:#fff; font-size:12.5px; color:var(--ink-soft); }
+  .panel-foot .row{ display:flex; justify-content:space-between; margin-bottom:4px; }
+  .panel-foot .row.total{ font-weight:700; color:var(--ink); font-size:14px; margin-top:6px; }
+
+  /* ── Add-receipt form ── */
+  .add-form{ padding:18px 22px; }
+  .af-label{ font-size:11px; color:var(--ink-soft); display:block; margin:12px 0 4px; }
+  .af-label:first-child{ margin-top:0; }
+  .add-form input[type=text], .add-form input[type=date], .add-form select{ width:100%; font-family:'IBM Plex Sans',sans-serif; font-size:13px; padding:8px 9px; border:1px solid var(--line); border-radius:3px; background:#fff; color:var(--ink); }
+  .item-build-row{ display:grid; grid-template-columns:1fr 46px 66px 108px 26px; gap:6px; align-items:center; margin-bottom:6px; }
+  .item-build-row input, .item-build-row select{ font-family:'IBM Plex Sans',sans-serif; font-size:12px; padding:6px 7px; border:1px solid var(--line); border-radius:3px; }
+  .item-build-row .rm{ background:none; border:none; color:var(--clay); font-size:15px; cursor:pointer; }
+  .add-item-btn{ font-family:'IBM Plex Mono',monospace; font-size:11.5px; background:none; border:1px dashed var(--line); color:var(--ink-soft); padding:7px 10px; border-radius:3px; cursor:pointer; width:100%; margin-top:2px; }
+  .add-item-btn:hover{ border-color:var(--pine); color:var(--pine); }
+  .af-total{ display:flex; justify-content:space-between; font-size:14px; font-weight:700; margin-top:16px; padding-top:12px; border-top:1px solid var(--line); }
+  .af-actions{ display:flex; gap:8px; margin-top:16px; }
+  .af-actions .save{ flex:1; }
+  .af-actions .cancel{ flex:none; }
+  .upload-zone{ border:1.5px dashed var(--line); border-radius:5px; padding:18px; text-align:center; cursor:pointer; background:#fff; transition:border-color .15s ease, background .15s ease; }
+  .upload-zone.drag{ border-color:var(--pine); background:var(--pine-soft); }
+  .visually-hidden{ position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+  .upload-icon{ font-size:22px; margin-bottom:4px; }
+  .upload-text{ font-size:12px; color:var(--ink-soft); }
+  .upload-zone img{ max-width:100%; max-height:220px; display:block; margin:0 auto; border-radius:3px; }
+  .scan-btn{ width:100%; margin-top:8px; }
+  .scan-status{ font-size:11.5px; color:var(--ink-soft); margin-top:6px; min-height:16px; display:flex; align-items:center; gap:6px; }
+  .scan-status.busy{ color:var(--amber); }
+  .scan-status.done{ color:var(--pine); }
+  .spinner{ width:10px; height:10px; border-radius:50%; border:2px solid var(--amber-soft); border-top-color:var(--amber); animation:spin .7s linear infinite; display:inline-block; }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+
+  /* ── Members tab ── */
+  .trip-box{ background:#fff; border:1px solid var(--line); border-radius:5px; padding:14px 16px; margin-bottom:12px; max-width:720px; }
+  .trip-box .tb-title{ font-weight:600; font-size:13px; margin-bottom:8px; }
+  .trip-box .tb-row{ display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; }
+  .trip-box .tb-hint{ font-size:11.5px; color:var(--ink-soft); margin-top:8px; }
+  .trip-box input[type=text], .trip-box input[type=date]{ font:inherit; padding:6px 8px; border:1px solid var(--line); border-radius:4px; background:#fff; }
+  .empty-state{ grid-column:1/-1; text-align:center; color:var(--ink-soft); font-size:13px; padding:32px 12px; border:1px dashed var(--line); border-radius:6px; }
+  .member-del{ background:none; border:none; color:var(--clay); cursor:pointer; font-size:12px; margin-left:10px; }
+  .member-card{ background:#fff; border:1px solid var(--line); border-radius:5px; padding:14px 16px; margin-bottom:10px; }
+  .member-top{ display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+  .member-name{ font-weight:700; font-size:14.5px; }
+  .member-controls{ display:flex; flex-wrap:wrap; gap:14px; align-items:center; font-size:12px; }
+  .mc-group{ display:flex; align-items:center; gap:6px; }
+  .mc-group label{ color:var(--ink-soft); }
+  .mc-group input[type=date]{ font-family:'IBM Plex Mono',monospace; font-size:11.5px; padding:4px 6px; border:1px solid var(--line); border-radius:3px; }
+  .mc-group select{ font-size:12px; padding:4px 6px; border:1px solid var(--line); border-radius:3px; }
+  .meal-toggle{ display:flex; gap:8px; }
+  .meal-toggle label{ display:flex; align-items:center; gap:3px; font-size:11.5px; color:var(--ink-soft); }
+  .bar-track{ height:6px; background:var(--stone-soft); border-radius:3px; margin-top:10px; position:relative; }
+  .bar-fill{ position:absolute; top:0; bottom:0; background:var(--pine); border-radius:3px; }
+
+  /* ── Settlement tab ── */
+  table.settle{ width:100%; border-collapse:collapse; font-size:13px; margin-bottom:26px; background:#fff; }
+  table.settle th, table.settle td{ padding:9px 10px; border-bottom:1px solid var(--line); text-align:right; }
+  table.settle th:first-child, table.settle td:first-child{ text-align:left; }
+  table.settle th{ font-family:'IBM Plex Mono',monospace; font-size:10.5px; text-transform:uppercase; color:var(--ink-soft); font-weight:600; }
+  .net-pos{ color:var(--pine); font-weight:600; } .net-neg{ color:var(--clay); font-weight:600; }
+  .payment{ display:flex; align-items:center; gap:10px; background:#fff; border:1px solid var(--line); border-radius:5px; padding:12px 16px; margin-bottom:8px; font-size:13.5px; }
+  .payment .arrow{ color:var(--ink-soft); }
+  .payment .amt{ margin-left:auto; font-family:'IBM Plex Mono',monospace; font-weight:600; }
+  .status-banner{ display:none; align-items:center; gap:10px; font-size:12.5px; padding:10px 14px; border-radius:5px; margin-bottom:18px; max-width:640px; }
+  .status-banner.show{ display:flex; }
+  .status-banner.info{ background:var(--amber-soft); color:#7a5a1f; border:1px solid var(--amber); }
+  .status-banner.error{ background:var(--clay-soft); color:var(--clay); border:1px solid var(--clay); }
+  .status-banner.ok{ background:var(--pine-soft); color:var(--pine); border:1px solid var(--pine); }
+  .status-banner button{ font-family:'IBM Plex Mono',monospace; font-size:11px; background:none; border:1px solid currentColor; color:inherit; padding:4px 9px; border-radius:3px; cursor:pointer; margin-left:auto; flex:none; }
+  .kind-toggle{ display:flex; gap:6px; margin-bottom:16px; }
+  .kind-btn{ flex:1; font-family:'IBM Plex Mono',monospace; font-size:11.5px; padding:9px 8px; border:1px solid var(--line); background:#fff; color:var(--ink-soft); border-radius:4px; cursor:pointer; }
+  .kind-btn.active{ border-color:var(--pine); background:var(--pine-soft); color:var(--pine); font-weight:600; }
+  .attendee-list{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px; }
+  .attendee-chip{ display:flex; align-items:center; gap:5px; font-size:12px; border:1px solid var(--line); border-radius:12px; padding:5px 10px 5px 8px; cursor:pointer; user-select:none; background:#fff; }
+  .attendee-chip.checked{ border-color:var(--pine); background:var(--pine-soft); color:var(--pine); font-weight:600; }
+  .attendee-chip input{ display:none; }
+  .select-all-link{ font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--ink-soft); background:none; border:none; text-decoration:underline; cursor:pointer; padding:0; margin-bottom:10px; }
+  .photo-slot{ padding:10px; margin-top:12px; }
+  .photo-slot img{ max-height:160px; }
+  .photo-slot .upload-icon{ font-size:18px; margin-bottom:2px; }
+  .photo-slot .upload-text{ font-size:11px; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════
+     SCREEN 1 — Supabase config (developer setup)
+     ════════════════════════════════════════════════════ -->
+<div class="screen active" id="screen-config">
+  <div class="card-wrap">
+    <div class="card">
+      <h1>Trip Ledger</h1>
+      <p class="tagline">Connect to your Supabase database to get started. Saved in this browser only.</p>
+      <label class="f-label">Supabase Project URL</label>
+      <input class="f-input" id="cfg-url" type="text" placeholder="https://abcxyz.supabase.co" autocomplete="off">
+      <label class="f-label">Anon / Public Key</label>
+      <input class="f-input" id="cfg-key" type="text" placeholder="eyJhbGciOi…" autocomplete="off">
+      <div class="f-error" id="cfg-error"></div>
+      <button class="f-btn" id="cfg-connect">Connect →</button>
+      <details>
+        <summary>Where do I find these?</summary>
+        <p class="hint-body">
+          1. Create a free project at <a href="https://supabase.com" target="_blank">supabase.com</a><br>
+          2. Run <code>setup.sql</code> in the SQL Editor<br>
+          3. Go to <strong>Project Settings → API</strong><br>
+          4. Copy the Project URL and the <strong>anon/public</strong> key
+        </p>
+      </details>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     SCREEN 2 — Sign in / Sign up
+     ════════════════════════════════════════════════════ -->
+<div class="screen" id="screen-auth">
+  <div class="card-wrap">
+    <div class="card">
+      <h1>Trip Ledger</h1>
+      <p class="tagline">Sign in to access your trips, or create a new account for a 2-day free trial.</p>
+      <div class="auth-mode">
+        <button class="active" id="auth-tab-signin">Sign in</button>
+        <button id="auth-tab-signup">Create account</button>
+      </div>
+      <label class="f-label">Email</label>
+      <input class="f-input" id="auth-email" type="email" placeholder="you@example.com" autocomplete="email">
+      <label class="f-label">Password</label>
+      <input class="f-input" id="auth-password" type="password" placeholder="••••••••" autocomplete="current-password">
+      <div id="auth-name-row" style="display:none;">
+        <label class="f-label">Your name (optional)</label>
+        <input class="f-input" id="auth-name" type="text" placeholder="e.g. Josh">
+      </div>
+      <div class="f-error" id="auth-error"></div>
+      <button class="f-btn" id="auth-submit">Sign in</button>
+      <button class="f-link" id="auth-forgot" style="display:block;margin-top:12px;">Forgot password?</button>
+      <button class="f-link" id="cfg-back-btn" style="display:block;margin-top:6px;font-size:11px;color:var(--stone);">Change database connection…</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     SCREEN 3 — Paywall (trial expired / no subscription)
+     ════════════════════════════════════════════════════ -->
+<div class="screen" id="screen-paywall">
+  <div class="card-wrap">
+    <div class="card">
+      <h1>Your trial has ended</h1>
+      <p class="tagline">Pick a plan to keep using Trip Ledger. Cancel any time.</p>
+      <div class="plan-grid">
+        <div class="plan-card">
+          <div class="plan-name">Monthly</div>
+          <div class="plan-price">€2</div>
+          <div class="plan-sub">per month</div>
+          <button class="plan-btn" id="subscribe-monthly">Subscribe</button>
+        </div>
+        <div class="plan-card featured">
+          <div class="plan-name">Annual</div>
+          <div class="plan-price">€20</div>
+          <div class="plan-sub">per year</div>
+          <div class="plan-badge">Save €4</div>
+          <button class="plan-btn" id="subscribe-yearly">Subscribe</button>
+        </div>
+      </div>
+      <div class="paywall-note">
+        Already subscribed? <button id="refresh-sub-btn">Refresh status</button>
+      </div>
+      <button class="f-link" id="paywall-signout" style="display:block;margin-top:16px;text-align:center;">Sign out</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     SCREEN 4 — Trip list
+     ════════════════════════════════════════════════════ -->
+<div class="screen" id="screen-trips">
+  <div class="wrap">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+      <h1>Trip Ledger</h1>
+      <div class="user-menu-wrap">
+        <button class="user-btn" id="trips-user-btn">…</button>
+        <div class="user-dropdown" id="trips-user-dropdown">
+          <button id="trips-manage-sub">Manage subscription</button>
+          <button class="danger" id="trips-signout">Sign out</button>
+        </div>
+      </div>
+    </div>
+    <div id="trips-trial-banner" class="trial-banner" style="display:none;">
+      <span id="trips-trial-msg"></span>
+      <button id="trips-trial-upgrade">Subscribe →</button>
+    </div>
+    <div class="trips-header" style="margin-top:14px;">
+      <p class="sub" style="margin:0;">Your trips</p>
+      <button class="add-btn" id="new-trip-btn">+ New trip</button>
+    </div>
+    <div id="new-trip-form" class="new-trip-form" style="display:none;">
+      <strong style="font-size:13px;">New trip</strong>
+      <div class="nt-row">
+        <input type="text" id="nt-name" placeholder="Trip name (e.g. Portugal 2025)">
+        <input type="date" id="nt-start">
+        <input type="date" id="nt-end">
+        <button class="add-btn" id="nt-save">Create</button>
+        <button class="add-btn ghost" id="nt-cancel">Cancel</button>
+      </div>
+    </div>
+    <div id="trips-list"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     SCREEN 5 — Main app
+     ════════════════════════════════════════════════════ -->
+<div class="screen" id="screen-app">
+<div class="wrap">
+  <div class="app-topbar">
+    <button class="back-btn" id="back-to-trips">← All trips</button>
+    <div class="user-menu-wrap" style="margin-left:auto;">
+      <button class="user-btn" id="app-user-btn">…</button>
+      <div class="user-dropdown" id="app-user-dropdown">
+        <button id="app-manage-sub">Manage subscription</button>
+        <button class="danger" id="app-signout">Sign out</button>
+      </div>
+    </div>
+  </div>
+  <div id="app-trial-banner" class="trial-banner" style="display:none;">
+    <span id="app-trial-msg"></span>
+    <button id="app-trial-upgrade">Subscribe →</button>
+  </div>
+  <h1 id="appTitle">Trip Ledger</h1>
+  <p class="sub"><span id="tripRange"></span> Tap a receipt to claim items or assign the whole thing to one buyer. Presence and diet are set per person in Trip &amp; Members, and drive the Settlement tab automatically.</p>
+  <div class="status-banner" id="statusBanner"></div>
+
+  <div class="tabs">
+    <button class="tab active" data-view="receipts">Receipts</button>
+    <button class="tab" data-view="members">Trip &amp; Members</button>
+    <button class="tab" data-view="settlement">Settlement</button>
+  </div>
+
+  <div class="view active" id="view-receipts">
+    <div class="receipts-toolbar">
+      <div class="calendar" id="calendar"></div>
+      <button class="add-btn" id="addReceiptBtn">+ Add receipt</button>
+    </div>
+    <div class="grid" id="grid"></div>
+  </div>
+
+  <div class="view" id="view-members">
+    <div class="trip-box">
+      <div class="tb-title">Trip dates</div>
+      <div class="tb-row">
+        <div class="mc-group"><label>Trip name</label><input type="text" id="trip-name"></div>
+        <div class="mc-group"><label>First day</label><input type="date" id="trip-start"></div>
+        <div class="mc-group"><label>Last day</label><input type="date" id="trip-end"></div>
+        <button class="add-btn" id="trip-save">Save dates</button>
+      </div>
+      <div class="tb-hint">Set these first — receipts, the calendar and each person's stay all use this range.</div>
+    </div>
+    <div class="trip-box">
+      <div class="tb-title">Add a person</div>
+      <div class="tb-row">
+        <div class="mc-group"><label>Name</label><input type="text" id="new-member-name" placeholder="Name"></div>
+        <button class="add-btn" id="new-member-add">+ Add person</button>
+      </div>
+      <div class="tb-hint">New people start with the full trip, eating meat, drinking, and all three meals. Adjust them below.</div>
+    </div>
+    <div id="memberList"></div>
+  </div>
+
+  <div class="view" id="view-settlement">
+    <div style="font-size:12px;color:#33465c;background:var(--slate-soft);border:1px solid var(--slate);border-radius:4px;padding:8px 12px;margin-bottom:18px;max-width:640px;">
+      <strong>Net</strong> = what they paid minus what they owe. Positive means the group owes them; negative means they owe the group. These always balance to zero overall — the list below turns that into the actual transfers needed to settle up.
+    </div>
+    <table class="settle" id="settleTable">
+      <thead><tr><th>Person</th><th>Paid (credit)</th><th>Owes (debit)</th><th>Net</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <h3 style="font-family:'IBM Plex Mono',monospace;font-size:13px;margin:0 0 10px;">Who owes who — settle these up</h3>
+    <div id="payments"></div>
+  </div>
+</div>
+</div><!-- /screen-app -->
+
+<!-- Receipt detail panel -->
+<div class="overlay" id="overlay"></div>
+<div class="panel" id="panel">
+  <div class="panel-head">
+    <button class="close-btn" id="closeBtn">✕</button>
+    <div class="rid" id="pRid"></div>
+    <div class="store" id="pStore"></div>
+    <div class="meta" id="pMeta"></div>
+    <label class="upload-zone photo-slot" id="photoSlot" for="panelPhotoInput">
+      <input type="file" id="panelPhotoInput" accept="image/*" class="visually-hidden">
+      <div id="photoPlaceholder"><div class="upload-icon">📷</div><div class="upload-text">Tap to add a photo</div></div>
+      <img id="photoPreviewImg" style="display:none;">
+    </label>
+    <div class="scan-status" id="photoUploadStatus"></div>
+    <div class="field-row" id="dateRow"><label>Date</label><input type="date" id="dateInput"></div>
+    <div class="field-row"><label>Paid by</label><select id="buyerSelect"></select></div>
+  </div>
+  <div class="panel-body" id="pBody"></div>
+  <div class="panel-foot">
+    <div id="groceryFoot">
+      <div class="breakdown" id="fBreakdown"></div>
+      <div class="row"><span>Receipt total</span><span id="fTotal"></span></div>
+      <div class="row"><span>Claimed personally</span><span id="fClaimed"></span></div>
+      <div class="row total"><span>Pooled &amp; split by presence/diet</span><span id="fRemaining"></span></div>
+    </div>
+    <div id="restaurantFoot" style="display:none;">
+      <div class="row"><span>Total bill</span><span id="rfTotal"></span></div>
+      <div class="row total"><span id="rfSplitLabel">Split among 0 people</span><span id="rfSplitAmt"></span></div>
+    </div>
+    <button class="add-btn danger" id="deleteReceiptBtn" style="width:100%;margin-top:14px;">Delete receipt</button>
+  </div>
+</div>
+
+<!-- Add receipt panel -->
+<div class="overlay" id="overlay2"></div>
+<div class="panel" id="panel2">
+  <div class="panel-head">
+    <button class="close-btn" id="closeBtn2">✕</button>
+    <div class="rid">NEW RECEIPT</div>
+    <div class="store">Add a receipt</div>
+    <div class="meta">Enter it by hand — snap a photo later for auto-scan.</div>
+  </div>
+  <div class="panel-body add-form">
+    <div class="kind-toggle" id="kindToggle">
+      <button type="button" class="kind-btn active" data-kind="grocery">Grocery receipt</button>
+      <button type="button" class="kind-btn" data-kind="restaurant">Restaurant / bar tab</button>
+    </div>
+    <label class="af-label">Receipt photo</label>
+    <label class="upload-zone" id="af-upload-zone" for="af-photo-input">
+      <input type="file" id="af-photo-input" accept="image/*" class="visually-hidden">
+      <div id="af-upload-placeholder"><div class="upload-icon">📷</div><div class="upload-text">Tap to add a photo, or drop one here</div></div>
+      <img id="af-photo-preview" style="display:none;">
+    </label>
+    <button class="add-btn scan-btn" id="af-scan-btn" style="display:none;">Scan receipt</button>
+    <div class="scan-status" id="af-scan-status"></div>
+    <label class="af-label" id="af-store-label">Store / vendor</label>
+    <input type="text" id="af-store" placeholder="e.g. Corner Market">
+    <label class="af-label">Date</label>
+    <input type="date" id="af-date">
+    <label class="af-label">Paid by</label>
+    <select id="af-buyer"><option value="">— not yet claimed —</option></select>
+    <div id="groceryFields">
+      <label class="af-label">Items</label>
+      <div id="af-items"></div>
+      <button class="add-item-btn" id="af-add-item">+ add item</button>
+    </div>
+    <div id="restaurantFields" style="display:none;">
+      <label class="af-label">Bill amount</label>
+      <input type="number" min="0" step="0.01" id="af-restaurant-amount" placeholder="€ total bill">
+      <label class="af-label">Who was there?</label>
+      <button type="button" class="select-all-link" id="af-select-all">select everyone</button>
+      <div class="attendee-list" id="af-attendees"></div>
+    </div>
+    <div class="af-total"><span>Total</span><span id="af-total-amt">€0.00</span></div>
+    <div class="af-actions">
+      <button class="add-btn save" id="af-save">Save receipt</button>
+      <button class="add-btn ghost cancel" id="af-cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script>
+// ═══════════════════════════════════════════════════════════
+//  DEPLOY CONFIG — fill these in before pushing to GitHub Pages
+//  (leave blank to use the interactive setup screen instead)
+// ═══════════════════════════════════════════════════════════
+const DEFAULT_SUPABASE_URL = "https://hrxxjrpacmrrsfxfrvkr.supabase.co"; // e.g. "https://abcxyz.supabase.co"
+const DEFAULT_SUPABASE_KEY = "sb_publishable_RG3IH0yiJ5jGn8-Y9_YDiA_QetQuz9U"; // your anon / public key
+
+// Create these two Payment Links in your Stripe Dashboard, then paste the URLs here.
+// In each link's settings, set: Allow promotion codes → off, Collect billing address → auto
+// The app appends ?client_reference_id=USER_ID automatically so the webhook knows who paid.
+const STRIPE_MONTHLY_LINK = "https://buy.stripe.com/6oU4gzckJ34j6tpdC8eQM00";
+const STRIPE_YEARLY_LINK  = "https://buy.stripe.com/14AcN598xdIX3hddC8eQM01";
+// ═══════════════════════════════════════════════════════════
+
+const CONFIG_KEY    = "tlg_cfg_v2";
+const LAST_TRIP_KEY = "tlg_last_trip";
+
+let sbClient     = null;
+let currentUser  = null;
+let currentSub   = null;  // { status, trialEndsAt, plan, periodEnd }
+let currentTripId = null;
+
+// ── Config helpers ────────────────────────────────────────────────────────────
+function loadStoredConfig(){
+  try{ return JSON.parse(localStorage.getItem(CONFIG_KEY)||"{}"); }catch(e){ return {}; }
+}
+function saveStoredConfig(url,key){ localStorage.setItem(CONFIG_KEY,JSON.stringify({url:url.trim(),key:key.trim()})); }
+function clearStoredConfig(){ localStorage.removeItem(CONFIG_KEY); localStorage.removeItem(LAST_TRIP_KEY); }
+function initSupabase(url,key){ sbClient = supabase.createClient(url,key); }
+
+// ── Screen helpers ────────────────────────────────────────────────────────────
+function showScreen(id){
+  document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+}
+
+// ── Subscription helpers ──────────────────────────────────────────────────────
+async function fetchSubscription(){
+  const { data, error } = await sbClient.from("subscriptions").select("*").eq("user_id",currentUser.id).maybeSingle();
+  if(error) throw error;
+  if(!data) return { status:"expired" }; // trigger hasn't fired yet — shouldn't happen
+  if(data.status==="trial"){
+    const trialEnd = new Date(data.trial_ends_at);
+    return trialEnd > new Date()
+      ? { status:"trial", trialEndsAt: trialEnd }
+      : { status:"expired" };
+  }
+  if(data.status==="active"){
+    const periodEnd = new Date(data.current_period_end);
+    return periodEnd > new Date()
+      ? { status:"active", plan: data.plan, periodEnd }
+      : { status:"expired" };
+  }
+  return { status: data.status }; // cancelled / expired
+}
+
+function daysLeft(date){ return Math.max(0, Math.ceil((date-new Date())/86400000)); }
+
+function renderTrialBanner(bannerId, msgId, upgradeId){
+  const banner = document.getElementById(bannerId);
+  if(currentSub && currentSub.status==="trial"){
+    const days = daysLeft(currentSub.trialEndsAt);
+    document.getElementById(msgId).textContent =
+      days > 0 ? `${days} day${days===1?'':'s'} left in your free trial` : "Your trial ends today";
+    banner.style.display = "flex";
+    document.getElementById(upgradeId).onclick = () => showScreen("screen-paywall");
+  } else {
+    banner.style.display = "none";
+  }
+}
+
+// ── Stripe payment links ──────────────────────────────────────────────────────
+function openStripeLink(base){
+  if(!base){ alert("Stripe payment link not configured yet — set STRIPE_MONTHLY_LINK / STRIPE_YEARLY_LINK in index.html."); return; }
+  const url = new URL(base);
+  url.searchParams.set("client_reference_id", currentUser.id);
+  url.searchParams.set("prefilled_email", currentUser.email);
+  window.open(url.toString(), "_blank");
+}
+
+async function openManagePortal(){
+  const { data: { session } } = await sbClient.auth.getSession();
+  if(!session) return;
+  try {
+    const resp = await fetch(`${sbClient.supabaseUrl}/functions/v1/create-portal-session`, {
+      method:"POST",
+      headers:{ "Authorization":"Bearer "+session.access_token, "Content-Type":"application/json" },
+      body: JSON.stringify({ return_url: window.location.href })
+    });
+    const json = await resp.json();
+    if(json.url) window.location.href = json.url;
+    else alert("Couldn't open billing portal: "+(json.error||"unknown error"));
+  } catch(err){ alert("Couldn't reach billing portal: "+err.message); }
+}
+
+// ── User dropdown ─────────────────────────────────────────────────────────────
+function wireUserMenu(btnId, dropId, manageId, signoutId){
+  const btn = document.getElementById(btnId);
+  const drop = document.getElementById(dropId);
+  btn.onclick = (e) => { e.stopPropagation(); drop.classList.toggle("open"); };
+  document.addEventListener("click", ()=>drop.classList.remove("open"), { capture: false });
+  document.getElementById(manageId).onclick = openManagePortal;
+  document.getElementById(signoutId).onclick = async () => {
+    await sbClient.auth.signOut();
+    currentUser = null; currentSub = null; currentTripId = null;
+    showScreen("screen-auth");
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  SCREEN 1: Supabase config
+// ─────────────────────────────────────────────────────────────────────────────
+document.getElementById("cfg-connect").onclick = async () => {
+  const url = document.getElementById("cfg-url").value.trim();
+  const key = document.getElementById("cfg-key").value.trim();
+  const errEl = document.getElementById("cfg-error");
+  errEl.textContent = "";
+  if(!url.startsWith("https://")){ errEl.textContent = "Enter a valid Supabase project URL."; return; }
+  if(key.length < 20){ errEl.textContent = "Enter your Supabase anon key."; return; }
+  const btn = document.getElementById("cfg-connect");
+  btn.disabled = true; btn.textContent = "Connecting…";
+  try {
+    initSupabase(url,key);
+    const { error } = await sbClient.from("subscriptions").select("id").limit(1);
+    if(error) throw error;
+    saveStoredConfig(url,key);
+    showScreen("screen-auth");
+  } catch(err){
+    document.getElementById("cfg-error").textContent = "Connection failed: "+(err.message||err)+" — check the URL, key, and that you ran setup.sql.";
+    sbClient = null;
+  } finally { btn.disabled=false; btn.textContent="Connect →"; }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  SCREEN 2: Auth
+// ─────────────────────────────────────────────────────────────────────────────
+let authMode = "signin";
+
+function setAuthMode(mode){
+  authMode = mode;
+  const isSignup = mode === "signup";
+  document.getElementById("auth-tab-signin").classList.toggle("active", !isSignup);
+  document.getElementById("auth-tab-signup").classList.toggle("active", isSignup);
+  document.getElementById("auth-name-row").style.display = isSignup ? "" : "none";
+  document.getElementById("auth-submit").textContent = isSignup ? "Create account" : "Sign in";
+  document.getElementById("auth-forgot").style.display = isSignup ? "none" : "";
+  document.getElementById("auth-error").textContent = "";
+}
+document.getElementById("auth-tab-signin").onclick = () => setAuthMode("signin");
+document.getElementById("auth-tab-signup").onclick = () => setAuthMode("signup");
+
+document.getElementById("cfg-back-btn").onclick = () => showScreen("screen-config");
+
+document.getElementById("auth-forgot").onclick = async () => {
+  const email = document.getElementById("auth-email").value.trim();
+  if(!email){ document.getElementById("auth-error").textContent = "Enter your email first."; return; }
+  await sbClient.auth.resetPasswordForEmail(email, { redirectTo: window.location.href });
+  document.getElementById("auth-error").style.color = "var(--pine)";
+  document.getElementById("auth-error").textContent = "Reset link sent — check your email.";
+};
+
+document.getElementById("auth-submit").onclick = async () => {
+  const email    = document.getElementById("auth-email").value.trim();
+  const password = document.getElementById("auth-password").value;
+  const errEl    = document.getElementById("auth-error");
+  errEl.textContent = ""; errEl.style.color = "";
+  if(!email || !password){ errEl.textContent = "Enter your email and password."; return; }
+  const btn = document.getElementById("auth-submit");
+  btn.disabled = true; btn.textContent = authMode==="signup" ? "Creating…" : "Signing in…";
+  try {
+    let result;
+    if(authMode === "signup"){
+      result = await sbClient.auth.signUp({ email, password });
+      if(result.error) throw result.error;
+      if(result.data.user && !result.data.session){
+        errEl.style.color = "var(--pine)";
+        errEl.textContent = "Check your email to confirm your account, then sign in.";
+        setAuthMode("signin");
+        return;
+      }
+    } else {
+      result = await sbClient.auth.signInWithPassword({ email, password });
+      if(result.error) throw result.error;
+    }
+    currentUser = result.data.user || result.data.session?.user;
+    await routeAfterAuth();
+  } catch(err){
+    errEl.textContent = err.message || "Authentication failed.";
+  } finally { btn.disabled=false; btn.textContent = authMode==="signup"?"Create account":"Sign in"; }
+};
+
+// Handle Enter key on auth form
+["auth-email","auth-password","auth-name"].forEach(id=>{
+  document.getElementById(id)?.addEventListener("keydown", e=>{ if(e.key==="Enter") document.getElementById("auth-submit").click(); });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  SCREEN 3: Paywall
+// ─────────────────────────────────────────────────────────────────────────────
+document.getElementById("subscribe-monthly").onclick = () => openStripeLink(STRIPE_MONTHLY_LINK);
+document.getElementById("subscribe-yearly").onclick  = () => openStripeLink(STRIPE_YEARLY_LINK);
+document.getElementById("paywall-signout").onclick   = async () => { await sbClient.auth.signOut(); currentUser=null; currentSub=null; showScreen("screen-auth"); };
+document.getElementById("refresh-sub-btn").onclick   = async () => {
+  if(!currentUser) return;
+  const btn = document.getElementById("refresh-sub-btn");
+  btn.textContent = "Checking…"; btn.disabled = true;
+  try {
+    currentSub = await fetchSubscription();
+    await routeAfterAuth();
+  } catch(e){ /* silent */ }
+  finally { btn.textContent = "Refresh status"; btn.disabled = false; }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  SCREEN 4: Trips list
+// ─────────────────────────────────────────────────────────────────────────────
+wireUserMenu("trips-user-btn","trips-user-dropdown","trips-manage-sub","trips-signout");
+
+async function enterTripsScreen(){
+  // Update user button label
+  const email = currentUser.email || "Account";
+  document.getElementById("trips-user-btn").textContent = email.split("@")[0] + " ▾";
+  renderTrialBanner("trips-trial-banner","trips-trial-msg","trips-trial-upgrade");
+  showScreen("screen-trips");
+  await renderTripsList();
+}
+
+async function renderTripsList(){
+  const listEl = document.getElementById("trips-list");
+  listEl.innerHTML = '<div style="font-size:12px;color:var(--ink-soft);padding:8px 0;">Loading…</div>';
+  try {
+    const { data, error } = await sbClient.from("trips").select("*").order("created_at",{ascending:false});
+    if(error) throw error;
+    listEl.innerHTML = "";
+    if(!data || !data.length){ listEl.innerHTML = '<div class="trips-empty">No trips yet — create your first one above.</div>'; return; }
+    data.forEach(trip=>{
+      const card = document.createElement("div");
+      card.className = "trip-card";
+      const dates = trip.start_date && trip.end_date ? fmtDate(trip.start_date)+" – "+fmtDate(trip.end_date) : "Dates not set";
+      card.innerHTML = `
+        <div class="trip-card-info">
+          <div class="trip-card-name">${trip.name}</div>
+          <div class="trip-card-dates">${dates}</div>
+        </div>
+        <button class="trip-card-del" title="Delete trip">✕</button>
+        <button class="trip-card-open">Open →</button>
+      `;
+      card.querySelector(".trip-card-open").onclick = () => enterApp(trip);
+      card.querySelector(".trip-card-del").onclick = async(e)=>{
+        e.stopPropagation();
+        if(!confirm(`Delete "${trip.name}" and all its data? This can't be undone.`)) return;
+        const{error}=await sbClient.from("trips").delete().eq("id",trip.id);
+        if(error){ alert("Couldn't delete: "+error.message); return; }
+        await renderTripsList();
+      };
+      listEl.appendChild(card);
+    });
+  } catch(err){
+    listEl.innerHTML = `<div style="color:var(--clay);font-size:13px;">Error: ${err.message}</div>`;
+  }
+}
+
+document.getElementById("new-trip-btn").onclick = () => { document.getElementById("new-trip-form").style.display=""; document.getElementById("nt-name").focus(); };
+document.getElementById("nt-cancel").onclick = () => { document.getElementById("new-trip-form").style.display="none"; };
+document.getElementById("nt-save").onclick = async () => {
+  const name  = document.getElementById("nt-name").value.trim();
+  const start = document.getElementById("nt-start").value || null;
+  const end   = document.getElementById("nt-end").value || null;
+  if(!name){ alert("Enter a trip name."); return; }
+  if(start && end && end < start){ alert("End date must be on or after start date."); return; }
+  const btn = document.getElementById("nt-save");
+  btn.disabled=true; btn.textContent="Creating…";
+  const{data,error}=await sbClient.from("trips").insert({user_id:currentUser.id,name,start_date:start,end_date:end}).select().single();
+  btn.disabled=false; btn.textContent="Create";
+  if(error){ alert("Couldn't create: "+error.message); return; }
+  document.getElementById("new-trip-form").style.display="none";
+  document.getElementById("nt-name").value=""; document.getElementById("nt-start").value=""; document.getElementById("nt-end").value="";
+  enterApp(data);
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  SCREEN 5: Main app
+// ─────────────────────────────────────────────────────────────────────────────
+wireUserMenu("app-user-btn","app-user-dropdown","app-manage-sub","app-signout");
+
+document.getElementById("back-to-trips").onclick = async () => {
+  if(realtimeChannel){ sbClient.removeChannel(realtimeChannel); realtimeChannel=null; }
+  closePanel(); closeAddPanel();
+  await enterTripsScreen();
+};
+
+async function enterApp(trip){
+  currentTripId = trip.id;
+  localStorage.setItem(LAST_TRIP_KEY, trip.id);
+  const email = currentUser.email || "Account";
+  document.getElementById("app-user-btn").textContent = email.split("@")[0] + " ▾";
+  renderTrialBanner("app-trial-banner","app-trial-msg","app-trial-upgrade");
+  document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("active",t.dataset.view==="receipts"));
+  document.querySelectorAll(".view").forEach(v=>v.classList.toggle("active",v.id==="view-receipts"));
+  calendarFilter = null;
+  showScreen("screen-app");
+  await initApp();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  App state + helpers
+// ─────────────────────────────────────────────────────────────────────────────
+let TRIP_START=null, TRIP_END=null, TRIP_NAME="";
+const CATS = ["Consumables","House Supplies","Veggies","Meat","Alcohol"];
+let MEMBERS=[], receipts=[], calendarFilter=null;
+
+function dateList(s,e){ const out=[]; let d=new Date(s+"T00:00:00Z"), ed=new Date(e+"T00:00:00Z"); while(d<=ed){ out.push(d.toISOString().slice(0,10)); d=new Date(d.getTime()+86400000); } return out; }
+let TRIP_DATES=[];
+
+function applyTripDates(s,e,name){
+  TRIP_START=s||null; TRIP_END=e||null; TRIP_NAME=name||"";
+  TRIP_DATES=(s&&e&&s<=e)?dateList(s,e):[];
+  const el=document.getElementById("tripRange");
+  if(el) el.textContent=TRIP_DATES.length?(TRIP_NAME?TRIP_NAME+" · ":"")+fmtDate(s)+" – "+fmtDate(e)+" ·":"Set your trip dates in Trip & Members ·";
+  ["dateInput","af-date"].forEach(id=>{ const v=document.getElementById(id); if(v){ if(s&&e){v.min=s;v.max=e;}else{v.removeAttribute("min");v.removeAttribute("max");} } });
+  const t=document.getElementById("appTitle"); if(t) t.textContent=TRIP_NAME||"Trip Ledger";
+}
+
+async function loadTripSettings(){
+  const{data,error}=await sbClient.from("trips").select("*").eq("id",currentTripId).single();
+  if(error) throw error;
+  if(data) applyTripDates(data.start_date,data.end_date,data.name);
+}
+function chipClass(c){ return c.replace(/\s+/g,"-"); }
+function weekday(d){ return new Date(d+"T00:00:00Z").toLocaleDateString("en-GB",{weekday:"short",timeZone:"UTC"}); }
+function dayNum(d){ return new Date(d+"T00:00:00Z").getUTCDate(); }
+function fmtDate(d){ if(!d) return null; return new Date(d+"T00:00:00Z").toLocaleDateString("en-GB",{day:"2-digit",month:"short",timeZone:"UTC"}); }
+function categoryTotals(r){ const t={};r.items.forEach(i=>{ t[i.category]=(t[i.category]||0)+i.price; });const o={};CATS.forEach(c=>{if(t[c])o[c]=t[c];});return o; }
+function isPresent(m,d){ return d&&d>=m.arrive&&d<=m.depart; }
+function participationWeight(m){ const{breakfast,lunch,dinner}=m.meals;return((breakfast?1:0)+(lunch?1:0)+(dinner?1:0))/3; }
+function memberName(id){ const m=MEMBERS.find(x=>x.id===id);return m?m.name:null; }
+function shortId(id){ return id?id.slice(0,6).toUpperCase():"—"; }
+
+function setStatus(kind,msg,opts){
+  const el=document.getElementById("statusBanner");
+  el.className="status-banner show "+kind; el.innerHTML=`<span>${msg}</span>`;
+  if(opts&&opts.retry){ const b=document.createElement("button");b.textContent="Retry";b.onclick=initApp;el.appendChild(b); }
+}
+function clearStatus(){ const el=document.getElementById("statusBanner");el.className="status-banner";el.innerHTML=""; }
+
+function mapMemberRow(r){ return{id:r.id,name:r.name,arrive:r.arrive_date,depart:r.depart_date,diet:r.diet,drinks:r.drinks,meals:r.meals}; }
+function mapItemRow(r){ return{id:r.id,name:r.name,qty:r.qty,price:Number(r.price),category:r.category,claimed_by:r.claimed_by,claimed_amount:r.claimed_amount!=null?Number(r.claimed_amount):null}; }
+function mapReceiptRow(r){ return{id:r.id,store:r.store,date:r.date,total:Number(r.total),buyer_id:r.buyer_id,kind:r.kind||"grocery",attendees:r.attendees||[],photo_url:r.photo_url||null,items:(r.line_items||[]).map(mapItemRow)}; }
+
+async function loadMembers(){ const{data,error}=await sbClient.from("members").select("*").eq("trip_id",currentTripId).order("name"); if(error)throw error; return data.map(mapMemberRow); }
+async function loadReceipts(){ const{data,error}=await sbClient.from("receipts").select("*,line_items(*)").eq("trip_id",currentTripId).order("date"); if(error)throw error; return data.map(mapReceiptRow); }
+
+async function uploadReceiptPhoto(file){
+  const ext=(file.name.split(".").pop()||"jpg").toLowerCase();
+  const path=`receipt-${Date.now()}-${Math.random().toString(36).slice(2,8)}.${ext}`;
+  const{error}=await sbClient.storage.from("receipt-photos").upload(path,file,{upsert:false});
+  if(error) throw error;
+  return sbClient.storage.from("receipt-photos").getPublicUrl(path).data.publicUrl;
+}
+
+let realtimeChannel=null;
+
+async function initApp(){
+  clearStatus();
+  setStatus("info","Loading…");
+  try {
+    await loadTripSettings();
+    MEMBERS = await loadMembers();
+    receipts = await loadReceipts();
+    clearStatus();
+    renderCalendar(); renderGrid();
+    if(document.getElementById("view-members").classList.contains("active")) renderMembers();
+    if(document.getElementById("view-settlement").classList.contains("active")) renderSettlement();
+    subscribeRealtime();
+  } catch(err){ console.error(err); setStatus("error","Couldn't load data — "+(err.message||err),{retry:true}); }
+}
+
+function subscribeRealtime(){
+  if(realtimeChannel) sbClient.removeChannel(realtimeChannel);
+  realtimeChannel = sbClient.channel("ledger-"+currentTripId)
+    .on("postgres_changes",{event:"*",schema:"public",table:"trips"},refreshFromRemote)
+    .on("postgres_changes",{event:"*",schema:"public",table:"receipts"},refreshFromRemote)
+    .on("postgres_changes",{event:"*",schema:"public",table:"line_items"},refreshFromRemote)
+    .on("postgres_changes",{event:"*",schema:"public",table:"members"},refreshFromRemote)
+    .subscribe();
+}
+
+let refreshTimer=null;
+function refreshFromRemote(){
+  clearTimeout(refreshTimer);
+  refreshTimer=setTimeout(async()=>{
+    try{
+      await loadTripSettings(); MEMBERS=await loadMembers(); receipts=await loadReceipts();
+      renderCalendar(); renderGrid();
+      if(document.getElementById("view-members").classList.contains("active")) renderMembers();
+      if(document.getElementById("view-settlement").classList.contains("active")) renderSettlement();
+      if(panel.classList.contains("open")){
+        const r=receipts.find(r=>r.id===currentPanelReceiptId);
+        if(r) openPanel(r); else closePanel();
+      }
+    }catch(err){ console.error("refresh error",err); }
+  },400);
+}
+
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+document.querySelectorAll(".tab").forEach(t=>{
+  t.onclick=()=>{
+    document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
+    document.querySelectorAll(".view").forEach(x=>x.classList.remove("active"));
+    t.classList.add("active");
+    document.getElementById("view-"+t.dataset.view).classList.add("active");
+    if(t.dataset.view==="members") renderMembers();
+    if(t.dataset.view==="settlement") renderSettlement();
+  };
+});
+
+// ── Calendar ──────────────────────────────────────────────────────────────────
+function renderCalendar(){
+  const cal=document.getElementById("calendar"); cal.innerHTML="";
+  if(!TRIP_DATES.length){ cal.innerHTML='<div style="font-size:12px;color:var(--ink-soft);">Set trip dates to see the calendar.</div>'; return; }
+  TRIP_DATES.forEach(d=>{
+    const cnt=receipts.filter(r=>r.date===d).length;
+    const cell=document.createElement("div");
+    cell.className="day"+(calendarFilter===d?" active":"");
+    cell.innerHTML=`<div class="dow">${weekday(d)}</div><div class="num">${dayNum(d)}</div><div class="cnt ${cnt?'has':''}">${cnt?cnt+" receipt"+(cnt>1?"s":""):"—"}</div>`;
+    cell.onclick=()=>{ calendarFilter=(calendarFilter===d)?null:d; renderCalendar();renderGrid(); };
+    cal.appendChild(cell);
+  });
+}
+
+// ── Receipt grid ──────────────────────────────────────────────────────────────
+function renderGrid(){
+  const grid=document.getElementById("grid"); grid.innerHTML="";
+  if(!receipts.length){ grid.innerHTML='<div class="empty-state">No receipts yet. Tap "+ Add receipt" to log the first one.</div>'; return; }
+  const list=calendarFilter?receipts.filter(r=>r.date===calendarFilter):receipts;
+  list.forEach(r=>{
+    const isR=r.kind==="restaurant",isC=r.kind==="custom";
+    const card=document.createElement("div"); card.className="receipt";
+    const buyerName=memberName(r.buyer_id);
+    let bHtml,sHtml;
+    if(isR){ const n=(r.attendees||[]).length;bHtml=`<div class="brow"><span class="lbl"><span class="swatch" style="background:var(--amber);"></span>🍽️ Restaurant tab</span><span class="amt">split ${n} way${n===1?"":"s"}</span></div>`;sHtml=`<span class="dot ${n>0?"done":""}"></span>${n?n+" people attending":"no attendees set"}`; }
+    else if(isC){ const n=(r.attendees||[]).length;bHtml=`<div class="brow"><span class="lbl"><span class="swatch" style="background:var(--slate);"></span>💰 Custom split</span><span class="amt">${n} people</span></div>`;sHtml=`<span class="dot done"></span>fixed per-person amounts`; }
+    else{
+      const totals=categoryTotals(r);
+      bHtml=Object.entries(totals).map(([c,a])=>`<div class="brow"><span class="lbl"><span class="swatch ${chipClass(c)}"></span>${c}</span><span class="amt">€${a.toFixed(2)}</span></div>`).join("");
+      const cl=r.items.filter(i=>i.claimed_by).length;
+      const dc=cl===0?"":(cl<r.items.length?"partial":"done");
+      sHtml=`<span class="dot ${dc}"></span>${cl?cl+" item(s) claimed":"nothing claimed yet"}`;
+    }
+    card.innerHTML=`<div class="rid">#${shortId(r.id)}</div><div class="store">${r.store}${r.photo_url?" 📷":""}</div><div class="date ${r.date?"":"unassigned"}">${r.date?fmtDate(r.date):"needs a date"}</div><div class="buyer">${buyerName?"Paid by "+buyerName:""}</div><div class="total">€${r.total.toFixed(2)}</div><div class="breakdown">${bHtml}</div><div class="claim-status">${sHtml}</div>`;
+    card.onclick=()=>openPanel(r);
+    grid.appendChild(card);
+  });
+}
+
+// ── Receipt detail panel ──────────────────────────────────────────────────────
+const overlay=document.getElementById("overlay"), panel=document.getElementById("panel");
+document.getElementById("closeBtn").onclick=closePanel;
+overlay.onclick=closePanel;
+let currentPanelReceiptId=null;
+
+function renderPhotoSlot(r){
+  const img=document.getElementById("photoPreviewImg"),ph=document.getElementById("photoPlaceholder");
+  if(r.photo_url){ img.src=r.photo_url;img.style.display="block";ph.style.display="none"; }
+  else{ img.style.display="none";ph.style.display=""; }
+  const s=document.getElementById("photoUploadStatus"); s.textContent=""; s.className="scan-status";
+}
+
+function openPanel(r){
+  currentPanelReceiptId=r.id;
+  const isR=r.kind==="restaurant",isC=r.kind==="custom";
+  document.getElementById("pRid").textContent="#"+shortId(r.id);
+  document.getElementById("pStore").textContent=r.store;
+  document.getElementById("pMeta").textContent=isR?"Restaurant / bar tab":isC?"Custom split — fixed per-person amounts":r.items.length+" items";
+  renderPhotoSlot(r);
+  document.getElementById("panelPhotoInput").onchange=async(e)=>{
+    const file=e.target.files[0]; if(!file) return;
+    const st=document.getElementById("photoUploadStatus"); st.className="scan-status busy";st.innerHTML=`<span class="spinner"></span> Uploading…`;
+    try{ const url=await uploadReceiptPhoto(file);r.photo_url=url;await sbClient.from("receipts").update({photo_url:url}).eq("id",r.id);renderPhotoSlot(r);renderGrid(); }
+    catch(err){ st.className="scan-status";st.style.color="var(--clay)";st.textContent="Upload failed: "+err.message; }
+  };
+  const di=document.getElementById("dateInput"); di.value=r.date||"";
+  document.getElementById("dateRow").classList.toggle("needs-date",!r.date);
+  di.onchange=async()=>{ r.date=di.value||null;document.getElementById("dateRow").classList.toggle("needs-date",!r.date);renderGrid();renderCalendar();updateFooter(r);await sbClient.from("receipts").update({date:r.date}).eq("id",r.id); };
+  const bs=document.getElementById("buyerSelect");
+  bs.innerHTML=`<option value="">— not yet claimed —</option>`+MEMBERS.map(m=>`<option value="${m.id}" ${r.buyer_id===m.id?"selected":""}>${m.name}</option>`).join("");
+  bs.onchange=async()=>{ r.buyer_id=bs.value||null;renderGrid();await sbClient.from("receipts").update({buyer_id:r.buyer_id}).eq("id",r.id); };
+  document.getElementById("deleteReceiptBtn").onclick=async()=>{
+    if(!confirm(`Delete #${shortId(r.id)} — ${r.store}? Can't be undone.`)) return;
+    const{error}=await sbClient.from("receipts").delete().eq("id",r.id);
+    if(error){ alert("Couldn't delete: "+error.message);return; }
+    receipts.splice(receipts.findIndex(x=>x.id===r.id),1);
+    closePanel();renderCalendar();renderGrid();
+  };
+  document.getElementById("groceryFoot").style.display=(isR||isC)?"none":"";
+  document.getElementById("restaurantFoot").style.display=isR?"":"none";
+  const body=document.getElementById("pBody"); body.innerHTML="";
+  if(isC){
+    const w=document.createElement("div"); w.style.padding="16px 22px";
+    w.innerHTML=`<div class="af-label" style="margin-top:0;">Fixed per-person amounts</div>`+(r.attendees||[]).map(s=>`<div class="item-row" style="grid-template-columns:1fr auto;"><div class="name">${memberName(s.member_id)||"Unknown"}</div><div class="price">€${Number(s.amount).toFixed(2)}</div></div>`).join("")+`<div class="af-total"><span>Total</span><span>€${r.total.toFixed(2)}</span></div>`;
+    body.appendChild(w);
+  } else if(isR){
+    const w=document.createElement("div"); w.style.padding="16px 22px";
+    w.innerHTML=`<div class="af-label" style="margin-top:0;">Who was there?</div><div class="attendee-list" id="pAttendees"></div>`;
+    body.appendChild(w);
+    const aw=document.getElementById("pAttendees");
+    aw.innerHTML=MEMBERS.map(m=>`<label class="attendee-chip ${(r.attendees||[]).includes(m.id)?"checked":""}" data-id="${m.id}"><input type="checkbox" ${(r.attendees||[]).includes(m.id)?"checked":""}>${m.name}</label>`).join("");
+    aw.querySelectorAll(".attendee-chip").forEach(chip=>{
+      chip.onclick=async(e)=>{
+        e.preventDefault();const cb=chip.querySelector("input");cb.checked=!cb.checked;chip.classList.toggle("checked",cb.checked);
+        r.attendees=Array.from(aw.querySelectorAll(".attendee-chip input:checked")).map(i=>i.closest(".attendee-chip").dataset.id);
+        updateFooter(r);renderGrid();await sbClient.from("receipts").update({attendees:r.attendees}).eq("id",r.id);
+      };
+    });
+  } else {
+    r.items.forEach((item,idx)=>{
+      const row=document.createElement("div"); row.className="item-row";
+      row.innerHTML=`<div><div class="name">${item.name}</div><div class="cat">${item.category}</div></div><div class="price">€${item.price.toFixed(2)}</div><div class="claim-row ${item.claimed_by?"is-claimed":""}"><select data-idx="${idx}"><option value="">— unclaimed —</option>${MEMBERS.map(m=>`<option value="${m.id}" ${item.claimed_by===m.id?"selected":""}>${m.name}</option>`).join("")}</select><input type="number" step="0.01" placeholder="€ amount" value="${item.claimed_amount!=null?item.claimed_amount:""}"><span class="claimed-tag">✓ claimed</span></div>`;
+      body.appendChild(row);
+    });
+    body.querySelectorAll("select,input").forEach(el=>el.addEventListener("change",()=>updateClaim(r)));
+  }
+  updateFooter(r); overlay.classList.add("open"); panel.classList.add("open");
+}
+
+async function updateClaim(r){
+  const rows=document.querySelectorAll("#pBody .item-row");
+  for(let i=0;i<rows.length;i++){
+    const row=rows[i],sel=row.querySelector("select"),inp=row.querySelector("input"),cr=row.querySelector(".claim-row");
+    const pid=sel.value,amt=parseFloat(inp.value),item=r.items[i];
+    const valid=pid&&!isNaN(amt)&&amt>0,nb=valid?pid:null,na=valid?amt:null;
+    if(item.claimed_by!==nb||item.claimed_amount!==na){
+      item.claimed_by=nb;item.claimed_amount=na;cr.classList.toggle("is-claimed",valid);
+      await sbClient.from("line_items").update({claimed_by:nb,claimed_amount:na}).eq("id",item.id);
+    }
+  }
+  updateFooter(r);renderGrid();
+}
+
+function updateFooter(r){
+  if(r.kind==="restaurant"){
+    const n=(r.attendees||[]).length,sh=n>0?r.total/n:0;
+    document.getElementById("rfTotal").textContent="€"+r.total.toFixed(2);
+    document.getElementById("rfSplitLabel").textContent=`Split among ${n} ${n===1?"person":"people"}`;
+    document.getElementById("rfSplitAmt").textContent=n>0?"€"+sh.toFixed(2)+" each":"—"; return;
+  }
+  const cl=r.items.reduce((s,i)=>s+(i.claimed_by?i.claimed_amount:0),0);
+  document.getElementById("fTotal").textContent="€"+r.total.toFixed(2);
+  document.getElementById("fClaimed").textContent="€"+cl.toFixed(2);
+  document.getElementById("fRemaining").textContent="€"+(r.total-cl).toFixed(2);
+  document.getElementById("fBreakdown").innerHTML=Object.entries(categoryTotals(r)).map(([c,a])=>`<div class="brow"><span class="lbl"><span class="swatch ${chipClass(c)}"></span>${c}</span><span class="amt">€${a.toFixed(2)}</span></div>`).join("");
+}
+function closePanel(){ overlay.classList.remove("open");panel.classList.remove("open");currentPanelReceiptId=null; }
+
+// ── Members tab ───────────────────────────────────────────────────────────────
+function renderMembers(){
+  const tn=document.getElementById("trip-name"),ts=document.getElementById("trip-start"),te=document.getElementById("trip-end");
+  if(document.activeElement!==tn) tn.value=TRIP_NAME;
+  if(document.activeElement!==ts) ts.value=TRIP_START||"";
+  if(document.activeElement!==te) te.value=TRIP_END||"";
+  const wrap=document.getElementById("memberList"); wrap.innerHTML="";
+  if(!MEMBERS.length){ wrap.innerHTML='<div class="empty-state">No people yet.</div>'; return; }
+  MEMBERS.forEach(m=>{
+    const nights=TRIP_DATES.filter(d=>isPresent(m,d)).length,pct=TRIP_DATES.length?Math.round(nights/TRIP_DATES.length*100):0;
+    const card=document.createElement("div"); card.className="member-card";
+    card.innerHTML=`<div class="member-top"><div class="member-name">${m.name}</div><div style="font-size:11.5px;color:var(--ink-soft);">${nights}/${TRIP_DATES.length} nights<button class="member-del" data-del="1">Remove</button></div></div><div class="member-controls"><div class="mc-group"><label>Arrive</label><input type="date" min="${TRIP_START}" max="${TRIP_END}" value="${m.arrive}" data-field="arrive"></div><div class="mc-group"><label>Depart</label><input type="date" min="${TRIP_START}" max="${TRIP_END}" value="${m.depart}" data-field="depart"></div><div class="mc-group"><label>Diet</label><select data-field="diet"><option value="meat" ${m.diet==="meat"?"selected":""}>Eats meat</option><option value="veggie" ${m.diet==="veggie"?"selected":""}>Veggie only</option></select></div><div class="mc-group"><label>Drinks</label><select data-field="drinks"><option value="true" ${m.drinks?"selected":""}>Yes</option><option value="false" ${!m.drinks?"selected":""}>No</option></select></div><div class="meal-toggle"><label><input type="checkbox" data-meal="breakfast" ${m.meals.breakfast?"checked":""}> Breakfast</label><label><input type="checkbox" data-meal="lunch" ${m.meals.lunch?"checked":""}> Lunch</label><label><input type="checkbox" data-meal="dinner" ${m.meals.dinner?"checked":""}> Dinner</label></div></div><div class="bar-track"><div class="bar-fill" style="left:0;width:${pct}%;"></div></div>`;
+    card.querySelectorAll("input[type=date]").forEach(inp=>{ inp.onchange=async()=>{ m[inp.dataset.field]=inp.value;renderMembers();await sbClient.from("members").update({[inp.dataset.field==="arrive"?"arrive_date":"depart_date"]:inp.value}).eq("id",m.id); }; });
+    card.querySelector("[data-del]").onclick=async()=>{
+      const used=receipts.some(r=>r.buyer_id===m.id||(r.items||[]).some(i=>i.claimed_by===m.id)||(r.kind==="restaurant"&&(r.attendees||[]).includes(m.id))||(r.kind==="custom"&&(r.attendees||[]).some(a=>a.member_id===m.id)));
+      if(used){ alert(m.name+" is used on a receipt — remove or reassign those first."); return; }
+      if(!confirm("Remove "+m.name+"?")) return;
+      const{error}=await sbClient.from("members").delete().eq("id",m.id);
+      if(error){ alert("Couldn't remove: "+error.message);return; }
+      MEMBERS=MEMBERS.filter(x=>x.id!==m.id);renderMembers();
+    };
+    card.querySelector("[data-field=\"diet\"]").onchange=async e=>{ m.diet=e.target.value;await sbClient.from("members").update({diet:m.diet}).eq("id",m.id); };
+    card.querySelector("[data-field=\"drinks\"]").onchange=async e=>{ m.drinks=e.target.value==="true";await sbClient.from("members").update({drinks:m.drinks}).eq("id",m.id); };
+    card.querySelectorAll("[data-meal]").forEach(cb=>{ cb.onchange=async()=>{ m.meals[cb.dataset.meal]=cb.checked;await sbClient.from("members").update({meals:m.meals}).eq("id",m.id); }; });
+    wrap.appendChild(card);
+  });
+}
+
+document.getElementById("trip-save").onclick=async()=>{
+  const s=document.getElementById("trip-start").value,e=document.getElementById("trip-end").value,name=document.getElementById("trip-name").value.trim();
+  if(!s||!e){ alert("Pick both a first and last day."); return; }
+  if(e<s){ alert("Last day must be on or after the first day."); return; }
+  const{error}=await sbClient.from("trips").update({name,start_date:s,end_date:e}).eq("id",currentTripId);
+  if(error){ alert("Couldn't save: "+error.message);return; }
+  applyTripDates(s,e,name);renderCalendar();renderGrid();renderMembers();
+};
+
+document.getElementById("new-member-add").onclick=async()=>{
+  const inp=document.getElementById("new-member-name"),name=inp.value.trim();
+  if(!name){ alert("Enter a name."); return; }
+  if(!TRIP_DATES.length){ alert("Save the trip dates first."); return; }
+  if(MEMBERS.some(m=>m.name.toLowerCase()===name.toLowerCase())){ alert(name+" is already on the list."); return; }
+  const{data,error}=await sbClient.from("members").insert({trip_id:currentTripId,name,arrive_date:TRIP_START,depart_date:TRIP_END,diet:"meat",drinks:true,meals:{breakfast:true,lunch:true,dinner:true}}).select().single();
+  if(error){ alert("Couldn't add: "+error.message);return; }
+  MEMBERS.push(mapMemberRow(data));MEMBERS.sort((a,b)=>a.name.localeCompare(b.name));inp.value="";renderMembers();
+};
+
+// ── Settlement ────────────────────────────────────────────────────────────────
+function computeSettlement(){
+  const credit={},debit={};
+  MEMBERS.forEach(m=>{ credit[m.id]=0;debit[m.id]=0; });
+  receipts.forEach(r=>{
+    if(r.buyer_id) credit[r.buyer_id]=(credit[r.buyer_id]||0)+r.total;
+    if(r.kind==="restaurant"){ const att=r.attendees||[];if(att.length>0){ const sh=r.total/att.length;att.forEach(id=>{ debit[id]=(debit[id]||0)+sh; }); } return; }
+    if(r.kind==="custom"){ (r.attendees||[]).forEach(s=>{ debit[s.member_id]=(debit[s.member_id]||0)+Number(s.amount); }); return; }
+    const pool={};
+    r.items.forEach(item=>{ if(item.claimed_by){ debit[item.claimed_by]=(debit[item.claimed_by]||0)+item.claimed_amount;return; } pool[item.category]=(pool[item.category]||0)+item.price; });
+    Object.entries(pool).forEach(([cat,amt])=>{
+      let el=MEMBERS.filter(m=>(!r.date||isPresent(m,r.date))&&(cat!=="Meat"||m.diet==="meat")&&(cat!=="Alcohol"||m.drinks));
+      let tw=el.reduce((s,m)=>s+participationWeight(m),0);
+      if(tw<=0){ el=MEMBERS.filter(m=>!r.date||isPresent(m,r.date));tw=el.reduce((s,m)=>s+participationWeight(m),0); }
+      if(tw<=0) return;
+      el.forEach(m=>{ debit[m.id]+=amt*participationWeight(m)/tw; });
+    });
+  });
+  const net={};MEMBERS.forEach(m=>{ net[m.id]=(credit[m.id]||0)-(debit[m.id]||0); });
+  return{credit,debit,net};
+}
+
+function simplifyDebts(net){
+  const cr=Object.entries(net).filter(([,v])=>v>0.005).map(([id,v])=>({id,v})).sort((a,b)=>b.v-a.v);
+  const de=Object.entries(net).filter(([,v])=>v<-0.005).map(([id,v])=>({id,v:-v})).sort((a,b)=>b.v-a.v);
+  const p=[];let ci=0,di=0;
+  while(ci<cr.length&&di<de.length){ const c=cr[ci],d=de[di],a=Math.min(c.v,d.v);p.push({from:d.id,to:c.id,amount:a});c.v-=a;d.v-=a;if(c.v<0.005)ci++;if(d.v<0.005)di++; }
+  return p;
+}
+
+function renderSettlement(){
+  const{credit,debit,net}=computeSettlement();
+  const tbody=document.querySelector("#settleTable tbody");tbody.innerHTML="";
+  MEMBERS.forEach(m=>{ const n=net[m.id];const tr=document.createElement("tr");tr.innerHTML=`<td>${m.name}</td><td>€${credit[m.id].toFixed(2)}</td><td>€${debit[m.id].toFixed(2)}</td><td class="${n>=0?"net-pos":"net-neg"}">${n>=0?"+":""}€${n.toFixed(2)}</td>`;tbody.appendChild(tr); });
+  const payments=simplifyDebts(net),pdiv=document.getElementById("payments");pdiv.innerHTML="";
+  if(!payments.length){ pdiv.innerHTML=`<div style="color:var(--ink-soft);font-size:13px;">Nothing to settle yet — claim a "Paid by" on at least one receipt.</div>`; }
+  payments.forEach(p=>{ const row=document.createElement("div");row.className="payment";row.innerHTML=`<span>${memberName(p.from)}</span><span class="arrow">owes</span><span>${memberName(p.to)}</span><span class="amt">€${p.amount.toFixed(2)}</span>`;pdiv.appendChild(row); });
+  const tn=Object.values(net).reduce((s,v)=>s+v,0);
+  if(Math.abs(tn)>0.02){ const w=document.createElement("div");w.style.cssText="margin-top:10px;font-size:12px;color:var(--clay);";w.textContent=`Heads up: balances are off by €${tn.toFixed(2)} — check claimed amounts that don't match actual prices.`;pdiv.appendChild(w); }
+}
+
+// ── Add receipt form ──────────────────────────────────────────────────────────
+const OCR_POOL=[{n:"Sample vegetables",price:3.20,c:"Veggies"},{n:"Sample cheese",price:3.55,c:"Consumables"},{n:"Sample chicken",price:6.20,c:"Meat"},{n:"Sample water pack",price:2.50,c:"Consumables"},{n:"Sample beer",price:4.40,c:"Alcohol"},{n:"Sample paper towels",price:4.10,c:"House Supplies"}];
+let afPhotoFile=null,afItems=[],afKind="grocery";
+
+function afResetUpload(){ afPhotoFile=null;document.getElementById("af-photo-input").value="";document.getElementById("af-photo-preview").style.display="none";document.getElementById("af-photo-preview").src="";document.getElementById("af-upload-placeholder").style.display="";document.getElementById("af-scan-btn").style.display="none";document.getElementById("af-scan-btn").textContent="Scan receipt";const s=document.getElementById("af-scan-status");s.className="scan-status";s.textContent=""; }
+
+function afHandleFile(file){
+  if(!file||!file.type.startsWith("image/")) return;
+  afPhotoFile=file;const r=new FileReader();
+  r.onload=e=>{ const p=document.getElementById("af-photo-preview");p.src=e.target.result;p.style.display="block";document.getElementById("af-upload-placeholder").style.display="none";document.getElementById("af-scan-btn").style.display="block";const s=document.getElementById("af-scan-status");s.className="scan-status";s.textContent="Photo attached — ready to scan."; };
+  r.readAsDataURL(file);
+}
+
+const uploadZone=document.getElementById("af-upload-zone");
+document.getElementById("af-photo-input").addEventListener("change",e=>afHandleFile(e.target.files[0]));
+["dragenter","dragover"].forEach(ev=>uploadZone.addEventListener(ev,e=>{ e.preventDefault();uploadZone.classList.add("drag"); }));
+["dragleave","drop"].forEach(ev=>uploadZone.addEventListener(ev,e=>{ e.preventDefault();uploadZone.classList.remove("drag"); }));
+uploadZone.addEventListener("drop",e=>afHandleFile(e.dataTransfer.files[0]));
+
+document.getElementById("af-scan-btn").onclick=()=>{
+  const st=document.getElementById("af-scan-status"),btn=document.getElementById("af-scan-btn");
+  btn.disabled=true;st.className="scan-status busy";st.innerHTML=`<span class="spinner"></span> Scanning receipt…`;
+  setTimeout(()=>{
+    const picked=[...OCR_POOL].sort(()=>Math.random()-0.5).slice(0,4+Math.floor(Math.random()*4));
+    afItems=picked.map(it=>({n:it.n,qty:1,price:it.price,c:it.c}));afRenderItems();afUpdateTotal();
+    document.getElementById("af-store").value="Sample store";
+    const days=TRIP_DATES;document.getElementById("af-date").value=days.length?days[Math.floor(Math.random()*days.length)]:"";
+    st.className="scan-status done";st.textContent=`Scanned ${picked.length} items — check before saving.`;
+    btn.disabled=false;btn.textContent="Re-scan";
+  },1100);
+};
+
+function afRenderItems(){
+  const wrap=document.getElementById("af-items");wrap.innerHTML="";
+  afItems.forEach((it,idx)=>{
+    const row=document.createElement("div");row.className="item-build-row";
+    row.innerHTML=`<input type="text" placeholder="Item name" value="${it.n}" data-f="n"><input type="number" min="1" step="1" placeholder="Qty" value="${it.qty}" data-f="qty"><input type="number" min="0" step="0.01" placeholder="€ ea" value="${it.price}" data-f="price"><select data-f="c">${CATS.map(c=>`<option ${it.c===c?"selected":""}>${c}</option>`).join("")}</select><button class="rm" data-rm="${idx}">✕</button>`;
+    row.querySelectorAll("[data-f]").forEach(el=>{ const h=()=>{ const f=el.dataset.f;afItems[idx][f]=(f==="qty"||f==="price")?parseFloat(el.value)||0:el.value;afUpdateTotal(); };el.addEventListener("input",h);el.addEventListener("change",h); });
+    row.querySelector("[data-rm]").onclick=()=>{ afItems.splice(idx,1);afRenderItems();afUpdateTotal(); };
+    wrap.appendChild(row);
+  });
+}
+
+function afRenderAttendees(){
+  const wrap=document.getElementById("af-attendees");
+  wrap.innerHTML=MEMBERS.map(m=>`<label class="attendee-chip" data-id="${m.id}"><input type="checkbox">${m.name}</label>`).join("");
+  wrap.querySelectorAll(".attendee-chip").forEach(chip=>{ chip.onclick=e=>{ e.preventDefault();const cb=chip.querySelector("input");cb.checked=!cb.checked;chip.classList.toggle("checked",cb.checked); }; });
+}
+
+document.getElementById("af-select-all").onclick=()=>{ document.querySelectorAll("#af-attendees .attendee-chip").forEach(c=>{ c.querySelector("input").checked=true;c.classList.add("checked"); }); };
+
+function afUpdateTotal(){ document.getElementById("af-total-amt").textContent="€"+(afKind==="grocery"?afItems.reduce((s,it)=>s+(it.qty*it.price||0),0):parseFloat(document.getElementById("af-restaurant-amount").value)||0).toFixed(2); }
+document.getElementById("af-restaurant-amount").addEventListener("input",afUpdateTotal);
+
+document.querySelectorAll("#kindToggle .kind-btn").forEach(btn=>{
+  btn.onclick=()=>{
+    afKind=btn.dataset.kind;
+    document.querySelectorAll("#kindToggle .kind-btn").forEach(b=>b.classList.toggle("active",b===btn));
+    document.getElementById("groceryFields").style.display=afKind==="grocery"?"":"none";
+    document.getElementById("restaurantFields").style.display=afKind==="restaurant"?"":"none";
+    document.getElementById("af-store-label").textContent=afKind==="grocery"?"Store / vendor":"Restaurant / venue";
+    document.getElementById("af-store").placeholder=afKind==="grocery"?"e.g. Corner Market":"e.g. Beach Bar";
+    afUpdateTotal();
+  };
+});
+
+function openAddPanel(){
+  document.getElementById("af-store").value=""; document.getElementById("af-date").value=""; document.getElementById("af-restaurant-amount").value="";
+  afResetUpload();afKind="grocery";
+  document.querySelectorAll("#kindToggle .kind-btn").forEach(b=>b.classList.toggle("active",b.dataset.kind==="grocery"));
+  document.getElementById("groceryFields").style.display=""; document.getElementById("restaurantFields").style.display="none";
+  document.getElementById("af-store-label").textContent="Store / vendor"; document.getElementById("af-store").placeholder="e.g. Corner Market";
+  document.getElementById("af-buyer").innerHTML=`<option value="">— not yet claimed —</option>`+MEMBERS.map(m=>`<option value="${m.id}">${m.name}</option>`).join("");
+  afItems=[{n:"",qty:1,price:0,c:"Consumables"}];afRenderItems();afRenderAttendees();afUpdateTotal();
+  document.getElementById("overlay2").classList.add("open"); document.getElementById("panel2").classList.add("open");
+}
+function closeAddPanel(){ document.getElementById("overlay2").classList.remove("open"); document.getElementById("panel2").classList.remove("open"); }
+
+document.getElementById("addReceiptBtn").onclick=openAddPanel;
+document.getElementById("closeBtn2").onclick=closeAddPanel;
+document.getElementById("overlay2").onclick=closeAddPanel;
+document.getElementById("af-cancel").onclick=closeAddPanel;
+document.getElementById("af-add-item").onclick=()=>{ afItems.push({n:"",qty:1,price:0,c:"Consumables"});afRenderItems(); };
+
+document.getElementById("af-save").onclick=async()=>{
+  const store=document.getElementById("af-store").value.trim(),date=document.getElementById("af-date").value||null,buyerId=document.getElementById("af-buyer").value||null;
+  if(!store){ alert("Add a store or venue name."); return; }
+  let total,cleanItems=null,attendeeIds=null;
+  if(afKind==="grocery"){
+    cleanItems=afItems.filter(it=>it.n.trim()&&it.price>0).map(it=>({name:it.qty>1?`${it.n} ×${it.qty}`:it.n,price:Math.round(it.qty*it.price*100)/100,category:it.c}));
+    if(!cleanItems.length){ alert("Add at least one item with a name and a price."); return; }
+    total=Math.round(cleanItems.reduce((s,it)=>s+it.price,0)*100)/100;
+  } else {
+    total=parseFloat(document.getElementById("af-restaurant-amount").value);
+    if(!total||total<=0){ alert("Enter the bill amount."); return; }
+    attendeeIds=Array.from(document.querySelectorAll("#af-attendees .attendee-chip input:checked")).map(cb=>cb.closest(".attendee-chip").dataset.id);
+    if(!attendeeIds.length){ alert("Select at least one person."); return; }
+  }
+  const btn=document.getElementById("af-save");btn.disabled=true;btn.textContent="Saving…";
+  let photoUrl=null;
+  if(afPhotoFile){ try{ photoUrl=await uploadReceiptPhoto(afPhotoFile); }catch(err){ console.error(err); } }
+  const payload={trip_id:currentTripId,store,date,total,buyer_id:buyerId,kind:afKind,photo_url:photoUrl};
+  if(afKind==="restaurant") payload.attendees=attendeeIds;
+  const{data:nr,error:e1}=await sbClient.from("receipts").insert(payload).select().single();
+  if(e1){ alert("Couldn't save: "+e1.message);btn.disabled=false;btn.textContent="Save receipt";return; }
+  let newItems=[];
+  if(afKind==="grocery"){
+    const{data,error:e2}=await sbClient.from("line_items").insert(cleanItems.map(it=>({receipt_id:nr.id,name:it.name,qty:1,price:it.price,category:it.category}))).select();
+    if(e2) alert("Receipt saved but items failed: "+e2.message);
+    newItems=data||[];
+  }
+  btn.disabled=false;btn.textContent="Save receipt";
+  const ro=mapReceiptRow({...nr,line_items:newItems});receipts.push(ro);
+  closeAddPanel();renderCalendar();renderGrid();openPanel(ro);
+};
+
+// ═══════════════════════════════════════════════════════════
+//  Route after successful auth — check subscription and go
+// ═══════════════════════════════════════════════════════════
+async function routeAfterAuth(){
+  currentSub = await fetchSubscription();
+  if(currentSub.status === "trial" || currentSub.status === "active"){
+    await enterTripsScreen();
+  } else {
+    showScreen("screen-paywall");
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  Boot
+// ═══════════════════════════════════════════════════════════
+(async function boot(){
+  // 1. Determine Supabase credentials
+  let url = DEFAULT_SUPABASE_URL;
+  let key = DEFAULT_SUPABASE_KEY;
+
+  if(!url || !key){
+    const cfg = loadStoredConfig();
+    url = cfg.url || ""; key = cfg.key || "";
+  }
+
+  if(!url || !key){
+    showScreen("screen-config");
+    return;
+  }
+
+  // Pre-fill config fields in case user navigates back
+  document.getElementById("cfg-url").value = url;
+  document.getElementById("cfg-key").value = key;
+
+  initSupabase(url, key);
+
+  // 2. Check for an existing session
+  const { data: { session } } = await sbClient.auth.getSession();
+
+  if(!session){
+    showScreen("screen-auth");
+    return;
+  }
+
+  currentUser = session.user;
+
+  // 3. Check subscription and route
+  try {
+    await routeAfterAuth();
+  } catch(err){
+    console.error("boot error", err);
+    showScreen("screen-auth");
+  }
+
+  // 4. Listen for auth state changes (token refresh, sign-out)
+  sbClient.auth.onAuthStateChange(async (event, session) => {
+    if(event === "SIGNED_OUT"){ currentUser=null;currentSub=null;currentTripId=null;showScreen("screen-auth"); }
+    if(event === "SIGNED_IN" && session){ currentUser=session.user;await routeAfterAuth(); }
+  });
+})();
+</script>
+</body>
+</html>
