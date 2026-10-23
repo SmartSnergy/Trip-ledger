@@ -198,6 +198,9 @@
   .receipt:nth-child(3n+2){ transform:rotate(0.5deg); }
   .receipt:nth-child(3n+3){ transform:rotate(-0.3deg); }
   .receipt:hover{ transform:translateY(-3px) rotate(0deg); box-shadow:var(--shadow); z-index:2; }
+  .receipt.duplicate{ background:#fff7ed; border-color:#f59e0b; }
+  .receipt.duplicate .dup-badge{ display:inline-block; }
+  .dup-badge{ display:none; font-size:10px; font-weight:600; color:#92400e; background:#fde68a; border:1px solid #f59e0b; border-radius:3px; padding:1px 6px; margin-left:6px; vertical-align:middle; }
   .receipt .rid{ font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--ink-soft); }
   .receipt .store{ font-weight:600; font-size:14.5px; margin:3px 0 2px; }
   .receipt .date{ font-size:11.5px; color:var(--ink-soft); margin-bottom:2px; }
@@ -1138,10 +1141,15 @@ function renderCalendar(){
 function renderGrid(){
   const grid=document.getElementById("grid"); grid.innerHTML="";
   if(!receipts.length){ grid.innerHTML='<div class="empty-state">No receipts yet. Tap "+ Add receipt" to log the first one.</div>'; return; }
+  // Detect duplicates: same store (case-insensitive) + same date + same total
+  const dupKey=r=>`${(r.store||"").trim().toLowerCase()}|${r.date||""}|${r.total.toFixed(2)}`;
+  const keyCounts={};
+  receipts.forEach(r=>{ const k=dupKey(r); keyCounts[k]=(keyCounts[k]||0)+1; });
   const list=calendarFilter?receipts.filter(r=>r.date===calendarFilter):receipts;
   list.forEach(r=>{
     const isR=r.kind==="restaurant",isC=r.kind==="custom",isA=r.kind==="accommodation";
-    const card=document.createElement("div"); card.className="receipt";
+    const isDup=keyCounts[dupKey(r)]>1;
+    const card=document.createElement("div"); card.className="receipt"+(isDup?" duplicate":"");
     const buyerName=memberName(r.buyer_id);
     let bHtml,sHtml;
     if(isA){ const att=r.attendees||{};const ppl=att.people||[];const checkout=att.checkout||"?";const nights=r.date&&att.checkout?dateDiffNights(r.date,checkout):0;bHtml=`<div class="brow"><span class="lbl"><span class="swatch" style="background:var(--pine);"></span>🏠 Accommodation</span><span class="amt">${nights} night${nights===1?"":"s"}, ${ppl.length} people</span></div>`;sHtml=`<span class="dot ${ppl.length>0?"done":""}"></span>${ppl.length?ppl.length+" staying":"no guests set"}`; }
@@ -1154,7 +1162,7 @@ function renderGrid(){
       const dc=cl===0?"":(cl<r.items.length?"partial":"done");
       sHtml=`<span class="dot ${dc}"></span>${cl?cl+" item(s) claimed":"nothing claimed yet"}`;
     }
-    card.innerHTML=`<div class="rid">#${shortId(r.id)}</div><div class="store">${r.store}${r.photo_url?" 📷":""}</div><div class="date ${r.date?"":"unassigned"}">${r.date?fmtDate(r.date):"needs a date"}</div><div class="buyer">${buyerName?"Paid by "+buyerName:""}</div><div class="total">€${r.total.toFixed(2)}</div><div class="breakdown">${bHtml}</div><div class="claim-status">${sHtml}</div>`;
+    card.innerHTML=`<div class="rid">#${shortId(r.id)}</div><div class="store">${r.store}${r.photo_url?" 📷":""}<span class="dup-badge">Already scanned</span></div><div class="date ${r.date?"":"unassigned"}">${r.date?fmtDate(r.date):"needs a date"}</div><div class="buyer">${buyerName?"Paid by "+buyerName:""}</div><div class="total">€${r.total.toFixed(2)}</div><div class="breakdown">${bHtml}</div><div class="claim-status">${sHtml}</div>`;
     card.onclick=()=>openPanel(r);
     grid.appendChild(card);
   });
@@ -1685,8 +1693,22 @@ document.getElementById("af-scan-btn").onclick=async()=>{
 
     afRenderItems(); afUpdateTotal();
     const note = afReceiptTotal>0 && Math.abs(diff)>0.005 ? ` (€${Math.abs(diff).toFixed(2)} gap auto-filled)` : "";
+    // Warn if a receipt with the same store+date+total already exists in this trip
+    const scannedStore=(parsed.store||"").trim().toLowerCase();
+    const scannedDate=parsed.date||"";
+    const scannedTotal=afReceiptTotal;
+    const alreadyExists=scannedTotal>0 && receipts.some(r=>
+      (r.store||"").trim().toLowerCase()===scannedStore &&
+      r.date===scannedDate &&
+      Math.abs(r.total-scannedTotal)<0.01
+    );
     st.className="scan-status done";
-    st.textContent=`Found ${afItems.length} items${note} — verify totals below and save.`;
+    if(alreadyExists){
+      st.className="scan-status";st.style.color="var(--amber,#d97706)";
+      st.textContent=`⚠ This receipt looks like it was already scanned (same store, date & total). Check before saving.`;
+    } else {
+      st.textContent=`Found ${afItems.length} items${note} — verify totals below and save.`;
+    }
   } catch(err){
     st.className="scan-status"; st.style.color="var(--clay)";
     st.textContent="Scan failed: "+err.message;
