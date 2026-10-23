@@ -568,7 +568,8 @@
   <div class="panel-body add-form">
     <div class="kind-toggle" id="kindToggle">
       <button type="button" class="kind-btn active" data-kind="grocery">Grocery receipt</button>
-      <button type="button" class="kind-btn" data-kind="restaurant">Restaurant / bar tab</button>
+      <button type="button" class="kind-btn" data-kind="restaurant">Restaurant / bar</button>
+      <button type="button" class="kind-btn" data-kind="accommodation">Accommodation</button>
     </div>
     <label class="af-label">Receipt photo</label>
     <label class="upload-zone" id="af-upload-zone" for="af-photo-input">
@@ -592,9 +593,32 @@
     <div id="restaurantFields" style="display:none;">
       <label class="af-label">Bill amount</label>
       <input type="number" min="0" step="0.01" id="af-restaurant-amount" placeholder="€ total bill">
-      <label class="af-label">Who was there?</label>
-      <button type="button" class="select-all-link" id="af-select-all">select everyone</button>
-      <div class="attendee-list" id="af-attendees"></div>
+      <label class="af-label">Split mode</label>
+      <div class="kind-toggle" id="splitModeToggle" style="margin-bottom:10px;">
+        <button type="button" class="kind-btn active" data-mode="even">Even split</button>
+        <button type="button" class="kind-btn" data-mode="per_dish">Per dish</button>
+      </div>
+      <div id="evenSplitSection">
+        <label class="af-label">Who was there?</label>
+        <button type="button" class="select-all-link" id="af-select-all">select everyone</button>
+        <div class="attendee-list" id="af-attendees"></div>
+      </div>
+      <div id="perDishSection" style="display:none;">
+        <label class="af-label">Dishes</label>
+        <div id="af-dishes"></div>
+        <button class="add-item-btn" id="af-add-dish">+ add dish</button>
+      </div>
+    </div>
+    <div id="accommodationFields" style="display:none;">
+      <label class="af-label">Check-in date</label>
+      <input type="date" id="af-checkin" placeholder="Check-in">
+      <label class="af-label">Check-out date</label>
+      <input type="date" id="af-checkout" placeholder="Check-out">
+      <label class="af-label">Total cost</label>
+      <input type="number" min="0" step="0.01" id="af-accommodation-amount" placeholder="€ total cost">
+      <label class="af-label">Who stayed?</label>
+      <button type="button" class="select-all-link" id="af-acc-select-all">select everyone</button>
+      <div class="attendee-list" id="af-acc-attendees"></div>
     </div>
     <div class="af-total"><span>Total</span><span id="af-total-amt">€0.00</span></div>
     <div class="af-actions">
@@ -917,7 +941,7 @@ async function enterApp(trip){
 //  App state + helpers
 // ─────────────────────────────────────────────────────────────────────────────
 let TRIP_START=null, TRIP_END=null, TRIP_NAME="";
-const CATS = ["Veggies","Meat","Dairy","Bread","Drinks","Alcohol","Snacks","Frozen","Consumables","House Supplies"];
+const CATS = ["Fruit","Veggies","Meat","Eggs","Dairy","Bread","Drinks","Alcohol","Snacks","Frozen","Consumables","House Supplies"];
 let MEMBERS=[], receipts=[], calendarFilter=null;
 
 function dateList(s,e){ const out=[]; let d=new Date(s+"T00:00:00Z"), ed=new Date(e+"T00:00:00Z"); while(d<=ed){ out.push(d.toISOString().slice(0,10)); d=new Date(d.getTime()+86400000); } return out; }
@@ -954,8 +978,8 @@ function setStatus(kind,msg,opts){
 }
 function clearStatus(){ const el=document.getElementById("statusBanner");el.className="status-banner";el.innerHTML=""; }
 
-function mapMemberRow(r){ return{id:r.id,name:r.name,arrive:r.arrive_date,depart:r.depart_date,diet:r.diet,drinks:r.drinks,meals:r.meals}; }
-function mapItemRow(r){ return{id:r.id,name:r.name,qty:r.qty,price:Number(r.price),category:r.category,claimed_by:r.claimed_by,claimed_amount:r.claimed_amount!=null?Number(r.claimed_amount):null}; }
+function mapMemberRow(r){ return{id:r.id,name:r.name,arrive:r.arrive_date,depart:r.depart_date,diet:r.diet||"meat",drinks:r.drinks,meals:r.meals,no_dairy:r.no_dairy||false,no_gluten:r.no_gluten||false}; }
+function mapItemRow(r){ return{id:r.id,name:r.name,qty:r.qty,price:Number(r.price),category:r.category,dietary_tags:r.dietary_tags||[],claimed_by:r.claimed_by,claimed_amount:r.claimed_amount!=null?Number(r.claimed_amount):null}; }
 function mapReceiptRow(r){ return{id:r.id,store:r.store,date:r.date,total:Number(r.total),buyer_id:r.buyer_id,kind:r.kind||"grocery",attendees:r.attendees||[],photo_url:r.photo_url||null,items:(r.line_items||[]).map(mapItemRow)}; }
 
 async function loadMembers(){ const{data,error}=await sbClient.from("members").select("*").eq("trip_id",currentTripId).order("name"); if(error)throw error; return data.map(mapMemberRow); }
@@ -1045,11 +1069,12 @@ function renderGrid(){
   if(!receipts.length){ grid.innerHTML='<div class="empty-state">No receipts yet. Tap "+ Add receipt" to log the first one.</div>'; return; }
   const list=calendarFilter?receipts.filter(r=>r.date===calendarFilter):receipts;
   list.forEach(r=>{
-    const isR=r.kind==="restaurant",isC=r.kind==="custom";
+    const isR=r.kind==="restaurant",isC=r.kind==="custom",isA=r.kind==="accommodation";
     const card=document.createElement("div"); card.className="receipt";
     const buyerName=memberName(r.buyer_id);
     let bHtml,sHtml;
-    if(isR){ const n=(r.attendees||[]).length;bHtml=`<div class="brow"><span class="lbl"><span class="swatch" style="background:var(--amber);"></span>🍽️ Restaurant tab</span><span class="amt">split ${n} way${n===1?"":"s"}</span></div>`;sHtml=`<span class="dot ${n>0?"done":""}"></span>${n?n+" people attending":"no attendees set"}`; }
+    if(isA){ const att=r.attendees||{};const ppl=att.people||[];const checkout=att.checkout||"?";const nights=r.date&&att.checkout?dateDiffNights(r.date,checkout):0;bHtml=`<div class="brow"><span class="lbl"><span class="swatch" style="background:var(--pine);"></span>🏠 Accommodation</span><span class="amt">${nights} night${nights===1?"":"s"}, ${ppl.length} people</span></div>`;sHtml=`<span class="dot ${ppl.length>0?"done":""}"></span>${ppl.length?ppl.length+" staying":"no guests set"}`; }
+    else if(isR){ const att=r.attendees||[];const ppl=Array.isArray(att)?att:(att.people||[]);const mode=Array.isArray(att)?"even":(att.mode||"even");const n=ppl.length;bHtml=`<div class="brow"><span class="lbl"><span class="swatch" style="background:var(--amber);"></span>🍽️ Restaurant tab</span><span class="amt">${mode==="per_dish"?"per dish":"split "+n+" way"+(n===1?"":"s")}</span></div>`;sHtml=`<span class="dot ${n>0?"done":""}"></span>${n?n+" people attending":"no attendees set"}`; }
     else if(isC){ const n=(r.attendees||[]).length;bHtml=`<div class="brow"><span class="lbl"><span class="swatch" style="background:var(--slate);"></span>💰 Custom split</span><span class="amt">${n} people</span></div>`;sHtml=`<span class="dot done"></span>fixed per-person amounts`; }
     else{
       const totals=categoryTotals(r);
@@ -1082,7 +1107,7 @@ function openPanel(r){
   const isR=r.kind==="restaurant",isC=r.kind==="custom";
   document.getElementById("pRid").textContent="#"+shortId(r.id);
   document.getElementById("pStore").textContent=r.store;
-  document.getElementById("pMeta").textContent=isR?"Restaurant / bar tab":isC?"Custom split — fixed per-person amounts":r.items.length+" items";
+  document.getElementById("pMeta").textContent=isR?"Restaurant / bar tab":isC?"Custom split — fixed per-person amounts":(r.kind==="accommodation"?"Accommodation":r.items.length+" items");
   renderPhotoSlot(r);
   document.getElementById("panelPhotoInput").onchange=async(e)=>{
     const file=e.target.files[0]; if(!file) return;
@@ -1103,30 +1128,54 @@ function openPanel(r){
     receipts.splice(receipts.findIndex(x=>x.id===r.id),1);
     closePanel();renderCalendar();renderGrid();
   };
-  document.getElementById("groceryFoot").style.display=(isR||isC)?"none":"";
+  const isA=r.kind==="accommodation";
+  document.getElementById("groceryFoot").style.display=(isR||isC||isA)?"none":"";
   document.getElementById("restaurantFoot").style.display=isR?"":"none";
   const body=document.getElementById("pBody"); body.innerHTML="";
-  if(isC){
+  if(isA){
+    const att=r.attendees||{};const checkout=att.checkout||r.date;const ppl=att.people||[];
+    const totalNights=dateDiffNights(r.date,checkout)||1;
+    const perNight=r.total/totalNights;
+    const w=document.createElement("div"); w.style.padding="16px 22px";
+    let personRows="";
+    ppl.forEach(id=>{ const m=MEMBERS.find(x=>x.id===id);if(!m)return; const a=m.arrive>r.date?m.arrive:r.date,d=m.depart<checkout?m.depart:checkout;const n=dateDiffNights(a,d);personRows+=`<div class="item-row" style="grid-template-columns:1fr auto auto;gap:8px;"><div class="name">${m.name}</div><div class="cat">${n} night${n===1?"":"s"}</div><div class="price">€${(perNight*n).toFixed(2)}</div></div>`; });
+    w.innerHTML=`<div class="af-label" style="margin-top:0;">${totalNights} night${totalNights===1?"":"s"} · €${perNight.toFixed(2)}/night</div>${personRows}<div class="af-total"><span>Total</span><span>€${r.total.toFixed(2)}</span></div>`;
+    body.appendChild(w);
+  } else if(isC){
     const w=document.createElement("div"); w.style.padding="16px 22px";
     w.innerHTML=`<div class="af-label" style="margin-top:0;">Fixed per-person amounts</div>`+(r.attendees||[]).map(s=>`<div class="item-row" style="grid-template-columns:1fr auto;"><div class="name">${memberName(s.member_id)||"Unknown"}</div><div class="price">€${Number(s.amount).toFixed(2)}</div></div>`).join("")+`<div class="af-total"><span>Total</span><span>€${r.total.toFixed(2)}</span></div>`;
     body.appendChild(w);
   } else if(isR){
+    const att=r.attendees||[];
+    const attObj=Array.isArray(att)?{mode:"even",people:att}:att;
     const w=document.createElement("div"); w.style.padding="16px 22px";
-    w.innerHTML=`<div class="af-label" style="margin-top:0;">Who was there?</div><div class="attendee-list" id="pAttendees"></div>`;
+    if(attObj.mode==="per_dish"){
+      let dishRows=(attObj.dishes||[]).map(d=>`<div class="item-row" style="grid-template-columns:1fr auto auto;gap:8px;"><div class="name">${d.name}</div><div class="cat">${(d.people||[]).map(id=>memberName(id)||"?").join(", ")}</div><div class="price">€${d.price.toFixed(2)}</div></div>`).join("");
+      w.innerHTML=`<div class="af-label" style="margin-top:0;">Dishes (per-dish split)</div>${dishRows}<div class="af-total"><span>Total</span><span>€${r.total.toFixed(2)}</span></div>`;
+    } else {
+      const people=attObj.people||[];
+      w.innerHTML=`<div class="af-label" style="margin-top:0;">Who was there?</div><div class="attendee-list" id="pAttendees"></div>`;
+      body.appendChild(w);
+      const aw=document.getElementById("pAttendees");
+      aw.innerHTML=MEMBERS.map(m=>`<label class="attendee-chip ${people.includes(m.id)?"checked":""}" data-id="${m.id}"><input type="checkbox" ${people.includes(m.id)?"checked":""}>${m.name}</label>`).join("");
+      aw.querySelectorAll(".attendee-chip").forEach(chip=>{
+        chip.onclick=async(e)=>{
+          e.preventDefault();const cb=chip.querySelector("input");cb.checked=!cb.checked;chip.classList.toggle("checked",cb.checked);
+          const newPpl=Array.from(aw.querySelectorAll(".attendee-chip input:checked")).map(i=>i.closest(".attendee-chip").dataset.id);
+          r.attendees=Array.isArray(r.attendees)?newPpl:{...attObj,people:newPpl};
+          updateFooter(r);renderGrid();await sbClient.from("receipts").update({attendees:r.attendees}).eq("id",r.id);
+        };
+      });
+      updateFooter(r);
+      return;
+    }
     body.appendChild(w);
-    const aw=document.getElementById("pAttendees");
-    aw.innerHTML=MEMBERS.map(m=>`<label class="attendee-chip ${(r.attendees||[]).includes(m.id)?"checked":""}" data-id="${m.id}"><input type="checkbox" ${(r.attendees||[]).includes(m.id)?"checked":""}>${m.name}</label>`).join("");
-    aw.querySelectorAll(".attendee-chip").forEach(chip=>{
-      chip.onclick=async(e)=>{
-        e.preventDefault();const cb=chip.querySelector("input");cb.checked=!cb.checked;chip.classList.toggle("checked",cb.checked);
-        r.attendees=Array.from(aw.querySelectorAll(".attendee-chip input:checked")).map(i=>i.closest(".attendee-chip").dataset.id);
-        updateFooter(r);renderGrid();await sbClient.from("receipts").update({attendees:r.attendees}).eq("id",r.id);
-      };
-    });
   } else {
     r.items.forEach((item,idx)=>{
       const row=document.createElement("div"); row.className="item-row";
-      row.innerHTML=`<div><div class="name">${item.name}</div><div class="cat">${item.category}</div></div><div class="price">€${item.price.toFixed(2)}</div><div class="claim-row ${item.claimed_by?"is-claimed":""}"><select data-idx="${idx}"><option value="">— unclaimed —</option>${MEMBERS.map(m=>`<option value="${m.id}" ${item.claimed_by===m.id?"selected":""}>${m.name}</option>`).join("")}</select><input type="number" step="0.01" placeholder="€ amount" value="${item.claimed_amount!=null?item.claimed_amount:""}"><span class="claimed-tag">✓ claimed</span></div>`;
+      const tagMap={"vegan":"🌱","vegetarian":"🥦","contains_dairy":"🥛","contains_gluten":"🌾","contains_alcohol":"🍺"};
+      const tagHtml=(item.dietary_tags||[]).map(t=>tagMap[t]?`<span title="${t}" style="font-size:11px;">${tagMap[t]}</span>`:``).join(" ");
+      row.innerHTML=`<div><div class="name">${item.name} ${tagHtml}</div><div class="cat">${item.category}</div></div><div class="price">€${item.price.toFixed(2)}</div><div class="claim-row ${item.claimed_by?"is-claimed":""}"><select data-idx="${idx}"><option value="">— unclaimed —</option>${MEMBERS.map(m=>`<option value="${m.id}" ${item.claimed_by===m.id?"selected":""}>${m.name}</option>`).join("")}</select><input type="number" step="0.01" placeholder="€ amount" value="${item.claimed_amount!=null?item.claimed_amount:""}"><span class="claimed-tag">✓ claimed</span></div>`;
       body.appendChild(row);
     });
     body.querySelectorAll("select,input").forEach(el=>el.addEventListener("change",()=>updateClaim(r)));
@@ -1149,11 +1198,20 @@ async function updateClaim(r){
 }
 
 function updateFooter(r){
+  if(r.kind==="accommodation"||r.kind==="custom") return;
   if(r.kind==="restaurant"){
-    const n=(r.attendees||[]).length,sh=n>0?r.total/n:0;
+    const att=r.attendees||[];const attObj=Array.isArray(att)?{mode:"even",people:att}:att;
+    const ppl=attObj.people||[];const n=ppl.length;
     document.getElementById("rfTotal").textContent="€"+r.total.toFixed(2);
-    document.getElementById("rfSplitLabel").textContent=`Split among ${n} ${n===1?"person":"people"}`;
-    document.getElementById("rfSplitAmt").textContent=n>0?"€"+sh.toFixed(2)+" each":"—"; return;
+    if(attObj.mode==="per_dish"){
+      document.getElementById("rfSplitLabel").textContent="Per-dish split";
+      document.getElementById("rfSplitAmt").textContent="";
+    } else {
+      const sh=n>0?r.total/n:0;
+      document.getElementById("rfSplitLabel").textContent=`Split among ${n} ${n===1?"person":"people"}`;
+      document.getElementById("rfSplitAmt").textContent=n>0?"€"+sh.toFixed(2)+" each":"—";
+    }
+    return;
   }
   const cl=r.items.reduce((s,i)=>s+(i.claimed_by?i.claimed_amount:0),0);
   document.getElementById("fTotal").textContent="€"+r.total.toFixed(2);
@@ -1174,7 +1232,7 @@ function renderMembers(){
   MEMBERS.forEach(m=>{
     const nights=TRIP_DATES.filter(d=>isPresent(m,d)).length,pct=TRIP_DATES.length?Math.round(nights/TRIP_DATES.length*100):0;
     const card=document.createElement("div"); card.className="member-card";
-    card.innerHTML=`<div class="member-top"><div class="member-name">${m.name}</div><div style="font-size:11.5px;color:var(--ink-soft);">${nights}/${TRIP_DATES.length} nights<button class="member-del" data-del="1">Remove</button></div></div><div class="member-controls"><div class="mc-group"><label>Arrive</label><input type="date" min="${TRIP_START}" max="${TRIP_END}" value="${m.arrive}" data-field="arrive"></div><div class="mc-group"><label>Depart</label><input type="date" min="${TRIP_START}" max="${TRIP_END}" value="${m.depart}" data-field="depart"></div><div class="mc-group"><label>Diet</label><select data-field="diet"><option value="meat" ${m.diet==="meat"?"selected":""}>Eats meat</option><option value="veggie" ${m.diet==="veggie"?"selected":""}>Veggie only</option></select></div><div class="mc-group"><label>Drinks</label><select data-field="drinks"><option value="true" ${m.drinks?"selected":""}>Yes</option><option value="false" ${!m.drinks?"selected":""}>No</option></select></div><div class="meal-toggle"><label><input type="checkbox" data-meal="breakfast" ${m.meals.breakfast?"checked":""}> Breakfast</label><label><input type="checkbox" data-meal="lunch" ${m.meals.lunch?"checked":""}> Lunch</label><label><input type="checkbox" data-meal="dinner" ${m.meals.dinner?"checked":""}> Dinner</label></div></div><div class="bar-track"><div class="bar-fill" style="left:0;width:${pct}%;"></div></div>`;
+    card.innerHTML=`<div class="member-top"><div class="member-name">${m.name}</div><div style="font-size:11.5px;color:var(--ink-soft);">${nights}/${TRIP_DATES.length} nights<button class="member-del" data-del="1">Remove</button></div></div><div class="member-controls"><div class="mc-group"><label>Arrive</label><input type="date" min="${TRIP_START}" max="${TRIP_END}" value="${m.arrive}" data-field="arrive"></div><div class="mc-group"><label>Depart</label><input type="date" min="${TRIP_START}" max="${TRIP_END}" value="${m.depart}" data-field="depart"></div><div class="mc-group"><label>Diet</label><select data-field="diet"><option value="meat" ${m.diet==="meat"?"selected":""}>Eats meat</option><option value="pescatarian" ${m.diet==="pescatarian"?"selected":""}>Pescatarian</option><option value="vegetarian" ${(m.diet==="vegetarian"||m.diet==="veggie")?"selected":""}>Vegetarian</option><option value="vegan" ${m.diet==="vegan"?"selected":""}>Vegan</option></select></div><div class="mc-group"><label>Alcohol</label><select data-field="drinks"><option value="true" ${m.drinks?"selected":""}>Yes</option><option value="false" ${!m.drinks?"selected":""}>No</option></select></div></div><div class="member-controls" style="margin-top:6px;"><div class="mc-group"><label style="white-space:nowrap;"><input type="checkbox" data-field="no_dairy" ${m.no_dairy?"checked":""}> No dairy</label></div><div class="mc-group"><label style="white-space:nowrap;"><input type="checkbox" data-field="no_gluten" ${m.no_gluten?"checked":""}> No gluten</label></div><div class="meal-toggle" style="flex:3;"><label><input type="checkbox" data-meal="breakfast" ${m.meals.breakfast?"checked":""}> Breakfast</label><label><input type="checkbox" data-meal="lunch" ${m.meals.lunch?"checked":""}> Lunch</label><label><input type="checkbox" data-meal="dinner" ${m.meals.dinner?"checked":""}> Dinner</label></div></div><div class="bar-track"><div class="bar-fill" style="left:0;width:${pct}%;"></div></div>`;
     card.querySelectorAll("input[type=date]").forEach(inp=>{ inp.onchange=async()=>{ m[inp.dataset.field]=inp.value;renderMembers();await sbClient.from("members").update({[inp.dataset.field==="arrive"?"arrive_date":"depart_date"]:inp.value}).eq("id",m.id); }; });
     card.querySelector("[data-del]").onclick=async()=>{
       const used=receipts.some(r=>r.buyer_id===m.id||(r.items||[]).some(i=>i.claimed_by===m.id)||(r.kind==="restaurant"&&(r.attendees||[]).includes(m.id))||(r.kind==="custom"&&(r.attendees||[]).some(a=>a.member_id===m.id)));
@@ -1186,6 +1244,8 @@ function renderMembers(){
     };
     card.querySelector("[data-field=\"diet\"]").onchange=async e=>{ m.diet=e.target.value;await sbClient.from("members").update({diet:m.diet}).eq("id",m.id); };
     card.querySelector("[data-field=\"drinks\"]").onchange=async e=>{ m.drinks=e.target.value==="true";await sbClient.from("members").update({drinks:m.drinks}).eq("id",m.id); };
+    card.querySelector("[data-field=\"no_dairy\"]").onchange=async e=>{ m.no_dairy=e.target.checked;await sbClient.from("members").update({no_dairy:m.no_dairy}).eq("id",m.id); };
+    card.querySelector("[data-field=\"no_gluten\"]").onchange=async e=>{ m.no_gluten=e.target.checked;await sbClient.from("members").update({no_gluten:m.no_gluten}).eq("id",m.id); };
     card.querySelectorAll("[data-meal]").forEach(cb=>{ cb.onchange=async()=>{ m.meals[cb.dataset.meal]=cb.checked;await sbClient.from("members").update({meals:m.meals}).eq("id",m.id); }; });
     wrap.appendChild(card);
   });
@@ -1205,27 +1265,65 @@ document.getElementById("new-member-add").onclick=async()=>{
   if(!name){ alert("Enter a name."); return; }
   if(!TRIP_DATES.length){ alert("Save the trip dates first."); return; }
   if(MEMBERS.some(m=>m.name.toLowerCase()===name.toLowerCase())){ alert(name+" is already on the list."); return; }
-  const{data,error}=await sbClient.from("members").insert({trip_id:currentTripId,name,arrive_date:TRIP_START,depart_date:TRIP_END,diet:"meat",drinks:true,meals:{breakfast:true,lunch:true,dinner:true}}).select().single();
+  const{data,error}=await sbClient.from("members").insert({trip_id:currentTripId,name,arrive_date:TRIP_START,depart_date:TRIP_END,diet:"meat",drinks:true,no_dairy:false,no_gluten:false,meals:{breakfast:true,lunch:true,dinner:true}}).select().single();
   if(error){ alert("Couldn't add: "+error.message);return; }
   MEMBERS.push(mapMemberRow(data));MEMBERS.sort((a,b)=>a.name.localeCompare(b.name));inp.value="";renderMembers();
 };
 
 // ── Settlement ────────────────────────────────────────────────────────────────
+function dateDiffNights(a,b){ if(!a||!b) return 0; const da=new Date(a+"T00:00:00Z"),db=new Date(b+"T00:00:00Z"); return Math.max(0,Math.round((db-da)/86400000)); }
+
+function memberEligible(m,cat,tags){
+  const isVegan=m.diet==="vegan", isVeg=m.diet==="vegetarian"||m.diet==="veggie";
+  if(cat==="Meat"&&(isVegan||isVeg)) return false;
+  if(cat==="Dairy"&&(isVegan||m.no_dairy)) return false;
+  if(cat==="Eggs"&&isVegan) return false;
+  if(cat==="Alcohol"&&!m.drinks) return false;
+  if(tags.includes("contains_dairy")&&(isVegan||m.no_dairy)) return false;
+  if(tags.includes("contains_gluten")&&m.no_gluten) return false;
+  if(tags.includes("contains_alcohol")&&!m.drinks) return false;
+  return true;
+}
+
 function computeSettlement(){
   const credit={},debit={};
   MEMBERS.forEach(m=>{ credit[m.id]=0;debit[m.id]=0; });
   receipts.forEach(r=>{
     if(r.buyer_id) credit[r.buyer_id]=(credit[r.buyer_id]||0)+r.total;
-    if(r.kind==="restaurant"){ const att=r.attendees||[];if(att.length>0){ const sh=r.total/att.length;att.forEach(id=>{ debit[id]=(debit[id]||0)+sh; }); } return; }
+    if(r.kind==="restaurant"){
+      const att=r.attendees||[];
+      if(Array.isArray(att)){
+        if(att.length>0){ const sh=r.total/att.length;att.forEach(id=>{ debit[id]=(debit[id]||0)+sh; }); }
+      } else if(att.mode==="per_dish"){
+        (att.dishes||[]).forEach(dish=>{ if(!dish.people||!dish.people.length) return; const sh=dish.price/dish.people.length;dish.people.forEach(id=>{ debit[id]=(debit[id]||0)+sh; }); });
+      } else {
+        const ppl=att.people||[];if(ppl.length>0){ const sh=r.total/ppl.length;ppl.forEach(id=>{ debit[id]=(debit[id]||0)+sh; }); }
+      }
+      return;
+    }
+    if(r.kind==="accommodation"){
+      const att=r.attendees||{};
+      const checkout=att.checkout||r.date;
+      const people=att.people||[];
+      if(!people.length) return;
+      const totalNights=dateDiffNights(r.date,checkout)||1;
+      const costPerNight=r.total/totalNights;
+      let totalPN=0;
+      const pn={};
+      people.forEach(id=>{ const m=MEMBERS.find(x=>x.id===id);if(!m)return; const a=m.arrive>r.date?m.arrive:r.date,d=m.depart<checkout?m.depart:checkout;const n=dateDiffNights(a,d);pn[id]=n;totalPN+=n; });
+      if(totalPN<=0){ const sh=r.total/people.length;people.forEach(id=>{ debit[id]=(debit[id]||0)+sh; }); return; }
+      people.forEach(id=>{ debit[id]=(debit[id]||0)+r.total*(pn[id]||0)/totalPN; });
+      return;
+    }
     if(r.kind==="custom"){ (r.attendees||[]).forEach(s=>{ debit[s.member_id]=(debit[s.member_id]||0)+Number(s.amount); }); return; }
-    const pool={};
-    r.items.forEach(item=>{ if(item.claimed_by){ debit[item.claimed_by]=(debit[item.claimed_by]||0)+item.claimed_amount;return; } pool[item.category]=(pool[item.category]||0)+item.price; });
-    Object.entries(pool).forEach(([cat,amt])=>{
-      let el=MEMBERS.filter(m=>(!r.date||isPresent(m,r.date))&&(cat!=="Meat"||m.diet==="meat")&&(cat!=="Alcohol"||m.drinks));
+    r.items.forEach(item=>{
+      if(item.claimed_by){ debit[item.claimed_by]=(debit[item.claimed_by]||0)+item.claimed_amount;return; }
+      const tags=item.dietary_tags||[];
+      let el=MEMBERS.filter(m=>(!r.date||isPresent(m,r.date))&&memberEligible(m,item.category,tags));
       let tw=el.reduce((s,m)=>s+participationWeight(m),0);
       if(tw<=0){ el=MEMBERS.filter(m=>!r.date||isPresent(m,r.date));tw=el.reduce((s,m)=>s+participationWeight(m),0); }
       if(tw<=0) return;
-      el.forEach(m=>{ debit[m.id]+=amt*participationWeight(m)/tw; });
+      el.forEach(m=>{ debit[m.id]+=item.price*participationWeight(m)/tw; });
     });
   });
   const net={};MEMBERS.forEach(m=>{ net[m.id]=(credit[m.id]||0)-(debit[m.id]||0); });
@@ -1302,6 +1400,7 @@ document.getElementById("af-scan-btn").onclick=async()=>{
       qty: Number(it.qty)||1,
       price: Number(it.price)||0,
       c: validCats.has(it.category) ? it.category : "Consumables",
+      dietary_tags: it.dietary_tags||[],
     })).filter(it=>it.n && it.price!==0);
 
     afRenderItems(); afUpdateTotal();
@@ -1333,8 +1432,50 @@ function afRenderAttendees(){
 
 document.getElementById("af-select-all").onclick=()=>{ document.querySelectorAll("#af-attendees .attendee-chip").forEach(c=>{ c.querySelector("input").checked=true;c.classList.add("checked"); }); };
 
-function afUpdateTotal(){ document.getElementById("af-total-amt").textContent="€"+(afKind==="grocery"?afItems.reduce((s,it)=>s+(it.qty*it.price||0),0):parseFloat(document.getElementById("af-restaurant-amount").value)||0).toFixed(2); }
+let afRestaurantMode="even";
+let afDishes=[{name:"",price:0,people:[]}];
+
+function afRenderDishes(){
+  const wrap=document.getElementById("af-dishes");wrap.innerHTML="";
+  afDishes.forEach((d,idx)=>{
+    const row=document.createElement("div");row.className="item-build-row";
+    row.innerHTML=`<input type="text" placeholder="Dish name" value="${d.name}" data-f="name"><input type="number" min="0" step="0.01" placeholder="€" value="${d.price||""}" data-f="price"><div class="attendee-list" style="flex:2;min-width:0;">${MEMBERS.map(m=>`<label class="attendee-chip${d.people.includes(m.id)?" checked":""}" style="font-size:11px;padding:3px 8px;" data-id="${m.id}"><input type="checkbox" ${d.people.includes(m.id)?"checked":""}>${m.name}</label>`).join("")}</div><button class="rm" data-rm="${idx}">✕</button>`;
+    row.querySelector("[data-f='name']").addEventListener("input",e=>{ afDishes[idx].name=e.target.value;afUpdateTotal(); });
+    row.querySelector("[data-f='price']").addEventListener("input",e=>{ afDishes[idx].price=parseFloat(e.target.value)||0;afUpdateTotal(); });
+    row.querySelectorAll(".attendee-chip").forEach(chip=>{ chip.onclick=e=>{ e.preventDefault();const cb=chip.querySelector("input");cb.checked=!cb.checked;chip.classList.toggle("checked",cb.checked);afDishes[idx].people=Array.from(row.querySelectorAll(".attendee-chip input:checked")).map(i=>i.closest(".attendee-chip").dataset.id); }; });
+    row.querySelector("[data-rm]").onclick=()=>{ afDishes.splice(idx,1);afRenderDishes();afUpdateTotal(); };
+    wrap.appendChild(row);
+  });
+}
+
+function afUpdateTotal(){
+  let t=0;
+  if(afKind==="grocery") t=afItems.reduce((s,it)=>s+(it.qty*it.price||0),0);
+  else if(afKind==="restaurant"){ if(afRestaurantMode==="per_dish") t=afDishes.reduce((s,d)=>s+(d.price||0),0); else t=parseFloat(document.getElementById("af-restaurant-amount").value)||0; }
+  else if(afKind==="accommodation") t=parseFloat(document.getElementById("af-accommodation-amount").value)||0;
+  document.getElementById("af-total-amt").textContent="€"+t.toFixed(2);
+}
 document.getElementById("af-restaurant-amount").addEventListener("input",afUpdateTotal);
+document.getElementById("af-accommodation-amount").addEventListener("input",afUpdateTotal);
+
+document.querySelectorAll("#splitModeToggle .kind-btn").forEach(btn=>{
+  btn.onclick=()=>{
+    afRestaurantMode=btn.dataset.mode;
+    document.querySelectorAll("#splitModeToggle .kind-btn").forEach(b=>b.classList.toggle("active",b===btn));
+    document.getElementById("evenSplitSection").style.display=afRestaurantMode==="even"?"":"none";
+    document.getElementById("perDishSection").style.display=afRestaurantMode==="per_dish"?"":"none";
+    if(afRestaurantMode==="per_dish") afRenderDishes();
+    afUpdateTotal();
+  };
+});
+document.getElementById("af-add-dish").onclick=()=>{ afDishes.push({name:"",price:0,people:[]});afRenderDishes();afUpdateTotal(); };
+document.getElementById("af-acc-select-all").onclick=()=>{ document.querySelectorAll("#af-acc-attendees .attendee-chip").forEach(c=>{ c.querySelector("input").checked=true;c.classList.add("checked"); }); };
+
+function afRenderAccAttendees(){
+  const wrap=document.getElementById("af-acc-attendees");
+  wrap.innerHTML=MEMBERS.map(m=>`<label class="attendee-chip" data-id="${m.id}"><input type="checkbox">${m.name}</label>`).join("");
+  wrap.querySelectorAll(".attendee-chip").forEach(chip=>{ chip.onclick=e=>{ e.preventDefault();const cb=chip.querySelector("input");cb.checked=!cb.checked;chip.classList.toggle("checked",cb.checked); }; });
+}
 
 document.querySelectorAll("#kindToggle .kind-btn").forEach(btn=>{
   btn.onclick=()=>{
@@ -1342,20 +1483,25 @@ document.querySelectorAll("#kindToggle .kind-btn").forEach(btn=>{
     document.querySelectorAll("#kindToggle .kind-btn").forEach(b=>b.classList.toggle("active",b===btn));
     document.getElementById("groceryFields").style.display=afKind==="grocery"?"":"none";
     document.getElementById("restaurantFields").style.display=afKind==="restaurant"?"":"none";
-    document.getElementById("af-store-label").textContent=afKind==="grocery"?"Store / vendor":"Restaurant / venue";
-    document.getElementById("af-store").placeholder=afKind==="grocery"?"e.g. Corner Market":"e.g. Beach Bar";
+    document.getElementById("accommodationFields").style.display=afKind==="accommodation"?"":"none";
+    if(afKind==="grocery"){ document.getElementById("af-store-label").textContent="Store / vendor";document.getElementById("af-store").placeholder="e.g. Corner Market"; }
+    else if(afKind==="restaurant"){ document.getElementById("af-store-label").textContent="Restaurant / venue";document.getElementById("af-store").placeholder="e.g. Beach Bar"; }
+    else if(afKind==="accommodation"){ document.getElementById("af-store-label").textContent="Venue / property name";document.getElementById("af-store").placeholder="e.g. Airbnb Berlin"; }
     afUpdateTotal();
   };
 });
 
 function openAddPanel(){
-  document.getElementById("af-store").value=""; document.getElementById("af-date").value=""; document.getElementById("af-restaurant-amount").value="";
-  afResetUpload();afKind="grocery";
+  document.getElementById("af-store").value=""; document.getElementById("af-date").value=""; document.getElementById("af-restaurant-amount").value=""; document.getElementById("af-accommodation-amount").value="";
+  document.getElementById("af-checkin").value=""; document.getElementById("af-checkout").value="";
+  afResetUpload();afKind="grocery";afRestaurantMode="even";afDishes=[{name:"",price:0,people:[]}];
   document.querySelectorAll("#kindToggle .kind-btn").forEach(b=>b.classList.toggle("active",b.dataset.kind==="grocery"));
-  document.getElementById("groceryFields").style.display=""; document.getElementById("restaurantFields").style.display="none";
+  document.getElementById("groceryFields").style.display=""; document.getElementById("restaurantFields").style.display="none"; document.getElementById("accommodationFields").style.display="none";
+  document.querySelectorAll("#splitModeToggle .kind-btn").forEach(b=>b.classList.toggle("active",b.dataset.mode==="even"));
+  document.getElementById("evenSplitSection").style.display=""; document.getElementById("perDishSection").style.display="none";
   document.getElementById("af-store-label").textContent="Store / vendor"; document.getElementById("af-store").placeholder="e.g. Corner Market";
   document.getElementById("af-buyer").innerHTML=`<option value="">— not yet claimed —</option>`+MEMBERS.map(m=>`<option value="${m.id}">${m.name}</option>`).join("");
-  afItems=[{n:"",qty:1,price:0,c:"Consumables"}];afRenderItems();afRenderAttendees();afUpdateTotal();
+  afItems=[{n:"",qty:1,price:0,c:"Consumables"}];afRenderItems();afRenderAttendees();afRenderAccAttendees();afUpdateTotal();
   document.getElementById("overlay2").classList.add("open"); document.getElementById("panel2").classList.add("open");
 }
 function closeAddPanel(){ document.getElementById("overlay2").classList.remove("open"); document.getElementById("panel2").classList.remove("open"); }
@@ -1367,29 +1513,51 @@ document.getElementById("af-cancel").onclick=closeAddPanel;
 document.getElementById("af-add-item").onclick=()=>{ afItems.push({n:"",qty:1,price:0,c:"Consumables"});afRenderItems(); };
 
 document.getElementById("af-save").onclick=async()=>{
-  const store=document.getElementById("af-store").value.trim(),date=document.getElementById("af-date").value||null,buyerId=document.getElementById("af-buyer").value||null;
+  const store=document.getElementById("af-store").value.trim(),buyerId=document.getElementById("af-buyer").value||null;
   if(!store){ alert("Add a store or venue name."); return; }
-  let total,cleanItems=null,attendeeIds=null;
+  let total,cleanItems=null,attendeesPayload=null,dateVal=null;
   if(afKind==="grocery"){
-    cleanItems=afItems.filter(it=>it.n.trim()&&it.price>0).map(it=>({name:it.qty>1?`${it.n} ×${it.qty}`:it.n,price:Math.round(it.qty*it.price*100)/100,category:it.c}));
+    dateVal=document.getElementById("af-date").value||null;
+    cleanItems=afItems.filter(it=>it.n.trim()&&it.price>0).map(it=>({name:it.qty>1?`${it.n} ×${it.qty}`:it.n,price:Math.round(it.qty*it.price*100)/100,category:it.c,dietary_tags:it.dietary_tags||[]}));
     if(!cleanItems.length){ alert("Add at least one item with a name and a price."); return; }
     total=Math.round(cleanItems.reduce((s,it)=>s+it.price,0)*100)/100;
-  } else {
-    total=parseFloat(document.getElementById("af-restaurant-amount").value);
-    if(!total||total<=0){ alert("Enter the bill amount."); return; }
-    attendeeIds=Array.from(document.querySelectorAll("#af-attendees .attendee-chip input:checked")).map(cb=>cb.closest(".attendee-chip").dataset.id);
-    if(!attendeeIds.length){ alert("Select at least one person."); return; }
+  } else if(afKind==="restaurant"){
+    dateVal=document.getElementById("af-date").value||null;
+    if(afRestaurantMode==="per_dish"){
+      const dishes=afDishes.filter(d=>d.name.trim()&&d.price>0);
+      if(!dishes.length){ alert("Add at least one dish with a name and price."); return; }
+      const allPpl=[...new Set(dishes.flatMap(d=>d.people))];
+      total=Math.round(dishes.reduce((s,d)=>s+(d.price||0),0)*100)/100;
+      attendeesPayload={mode:"per_dish",people:allPpl,dishes};
+    } else {
+      total=parseFloat(document.getElementById("af-restaurant-amount").value);
+      if(!total||total<=0){ alert("Enter the bill amount."); return; }
+      const ppl=Array.from(document.querySelectorAll("#af-attendees .attendee-chip input:checked")).map(cb=>cb.closest(".attendee-chip").dataset.id);
+      if(!ppl.length){ alert("Select at least one person."); return; }
+      attendeesPayload={mode:"even",people:ppl};
+    }
+  } else if(afKind==="accommodation"){
+    const checkin=document.getElementById("af-checkin").value||null;
+    const checkout=document.getElementById("af-checkout").value||null;
+    if(!checkin||!checkout){ alert("Set both check-in and check-out dates."); return; }
+    if(checkout<=checkin){ alert("Check-out must be after check-in."); return; }
+    total=parseFloat(document.getElementById("af-accommodation-amount").value);
+    if(!total||total<=0){ alert("Enter the total accommodation cost."); return; }
+    const ppl=Array.from(document.querySelectorAll("#af-acc-attendees .attendee-chip input:checked")).map(cb=>cb.closest(".attendee-chip").dataset.id);
+    if(!ppl.length){ alert("Select at least one person who stayed."); return; }
+    dateVal=checkin;
+    attendeesPayload={checkout,people:ppl};
   }
   const btn=document.getElementById("af-save");btn.disabled=true;btn.textContent="Saving…";
   let photoUrl=null;
   if(afPhotoFile){ try{ photoUrl=await uploadReceiptPhoto(afPhotoFile); }catch(err){ console.error(err); } }
-  const payload={trip_id:currentTripId,store,date,total,buyer_id:buyerId,kind:afKind,photo_url:photoUrl};
-  if(afKind==="restaurant") payload.attendees=attendeeIds;
+  const payload={trip_id:currentTripId,store,date:dateVal,total,buyer_id:buyerId,kind:afKind,photo_url:photoUrl};
+  if(afKind==="restaurant"||afKind==="accommodation") payload.attendees=attendeesPayload;
   const{data:nr,error:e1}=await sbClient.from("receipts").insert(payload).select().single();
   if(e1){ alert("Couldn't save: "+e1.message);btn.disabled=false;btn.textContent="Save receipt";return; }
   let newItems=[];
   if(afKind==="grocery"){
-    const{data,error:e2}=await sbClient.from("line_items").insert(cleanItems.map(it=>({receipt_id:nr.id,name:it.name,qty:1,price:it.price,category:it.category}))).select();
+    const{data,error:e2}=await sbClient.from("line_items").insert(cleanItems.map(it=>({receipt_id:nr.id,name:it.name,qty:1,price:it.price,category:it.category,dietary_tags:it.dietary_tags||[]}))).select();
     if(e2) alert("Receipt saved but items failed: "+e2.message);
     newItems=data||[];
   }

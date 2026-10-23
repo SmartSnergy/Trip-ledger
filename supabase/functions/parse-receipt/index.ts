@@ -15,31 +15,42 @@ Return ONLY valid JSON in this exact shape:
   "date": "YYYY-MM-DD or null",
   "total": 0.00,
   "items": [
-    { "name": "clean product name in English", "qty": 1, "price": 0.00, "category": "Veggies" }
+    { "name": "clean product name in English", "qty": 1, "price": 0.00, "category": "Veggies", "dietary_tags": [] }
   ]
 }
 
+dietary_tags is an array containing zero or more of: "vegan", "vegetarian", "contains_dairy", "contains_gluten", "contains_alcohol"
+Rules for dietary_tags:
+- All items are "vegan" if they contain no meat, dairy, eggs, honey, or animal products
+- All items that are vegan OR dairy+egg-free are also "vegetarian"
+- Add "contains_dairy" if the item contains milk, cheese, butter, cream, yoghurt, whey, casein (includes sauces/breads made with dairy)
+- Add "contains_gluten" if the item contains wheat, rye, barley, spelt (bread, pasta, flour, beer, most baked goods, soy sauce)
+- Add "contains_alcohol" if the item contains alcohol
+- Most fresh fruit, vegetables, legumes, plain rice, and plain nuts are "vegan" + "vegetarian"
+
 Rules:
-- "price" is the TOTAL price for that line (qty × unit price already calculated)
+- "price" is ALWAYS the unit price per single item (the app multiplies qty × price itself)
 - qty defaults to 1
-- Skip tax summary rows, subtotals, payment lines, discount rows, barcodes, store address
-- Include discount lines as negative-price items only if they're product-specific (e.g. RABATT on a product)
+- For multi-unit lines like "0.99 x 2  1.98": qty=2, price=0.99 (unit price)
+- For weight lines like "0.962 kg x 1.69 EUR/kg  1.63": qty=1, price=1.63 (total charged — only one "unit")
+- For discount lines like "RABATT 20%  -0.36": qty=1, price=-0.36 (keep as single negative item)
+- Skip tax summary rows, subtotals, payment lines, barcodes, store address lines
 - Translate German item names to clear English (e.g. "Ganzes Hähnchen" → "Whole chicken")
 - Clean up abbreviations (e.g. "K.champignons" → "Champignon mushrooms", "Bio-Eier OKT 10er" → "Organic eggs x10")
-- For weight items like "0.962 kg x 1.69 EUR/kg = 1.63" use qty:1, price:1.63 (the actual charged amount)
-- For multi-unit like "0.99 x 2" use qty:2, price:1.98 (total), OR qty:2, price:0.99 (unit) — use total
 
-Categories (assign exactly one):
-- "Veggies" — fresh produce, fruit, vegetables
-- "Meat" — meat, fish, poultry, cold cuts
-- "Dairy" — eggs, milk, cheese, yoghurt, cream
-- "Bread" — bread, bakery items
-- "Drinks" — water, juice, soft drinks, coffee, tea
-- "Alcohol" — beer, wine, spirits
-- "Snacks" — sweets, crisps, chocolate, nuts, spreads
-- "Frozen" — frozen food
-- "House Supplies" — cleaning, hygiene, non-food household items
-- "Consumables" — cooking staples, canned goods, pasta, rice, oil, spices, condiments`;
+Categories (assign exactly one — be precise):
+- "Fruit" — all fresh or dried fruit (bananas, apples, kiwi, grapes, oranges, plums, avocado, etc.)
+- "Veggies" — all fresh vegetables (cucumber, carrot, fennel, broccoli, mushrooms, peppers, zucchini, pumpkin, onion, etc.)
+- "Meat" — meat, poultry, fish, cold cuts, sausages (chicken, chorizo, kabanos, etc.)
+- "Eggs" — eggs only (Bio-Eier, Eier, eggs — never put eggs in Dairy)
+- "Dairy" — ONLY animal dairy: milk, cheese, yoghurt, cream, butter, sour cream, quark, crème fraîche, dairy desserts. NEVER plant-based items here.
+- "Drinks" — water, juice, soft drinks, coffee, tea, oat milk, almond milk, soy milk, any plant-based drink, non-alcoholic beverages
+- "Bread" — bread, bakery, pastries
+- "Alcohol" — beer, wine, spirits, cider
+- "Snacks" — sweets, chocolate, crisps, nuts, peanut butter, spreads, protein bars
+- "Frozen" — frozen food items
+- "House Supplies" — cleaning products, hygiene, toiletries, household non-food (dishwasher tabs, cat litter, socks, bags, etc.)
+- "Consumables" — pantry staples: canned goods, pasta, rice, oil, spices, condiments, pulses (beans, chickpeas, lentils), tomatoes (canned/passata), sugar, flour`;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
