@@ -1403,9 +1403,18 @@ document.getElementById("af-scan-btn").onclick=async()=>{
       dietary_tags: it.dietary_tags||[],
     })).filter(it=>it.n && it.price!==0);
 
+    // If the receipt total doesn't match the items sum, add an adjustment line
+    const receiptTotal = parsed.total ? Math.round(Number(parsed.total)*100)/100 : 0;
+    const itemsSum = Math.round(afItems.reduce((s,it)=>s+(it.qty*it.price),0)*100)/100;
+    const diff = Math.round((receiptTotal - itemsSum)*100)/100;
+    if(receiptTotal > 0 && Math.abs(diff) > 0.005){
+      afItems.push({n: diff>0?"Unscanned items":"Receipt adjustment", qty:1, price:diff, c:"Consumables", dietary_tags:[]});
+    }
+
     afRenderItems(); afUpdateTotal();
+    const note = receiptTotal>0 && Math.abs(diff)>0.005 ? ` (€${Math.abs(diff).toFixed(2)} gap auto-filled)` : "";
     st.className="scan-status done";
-    st.textContent=`Found ${afItems.length} items — check and save.`;
+    st.textContent=`Found ${afItems.length} items${note} — check and save.`;
   } catch(err){
     st.className="scan-status"; st.style.color="var(--clay)";
     st.textContent="Scan failed: "+err.message;
