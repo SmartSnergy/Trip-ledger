@@ -36,7 +36,13 @@ QUANTITY AND PRICE RULES (read carefully — this is where mistakes happen):
 - Numbers in the PRODUCT NAME (e.g. "2er Pack", "6-pack", "500ml", "12x") are product descriptions, NOT quantity multipliers. Set qty=1.
 - For lines like "2 x 1,95  3,90" or "2 St 1,95 EUR  3,90": qty=2, price=1.95 (the unit price, NOT 3.90)
 - For weight lines like "0.962 kg x 1.69 EUR/kg  1.63": qty=1, price=1.63 (only one charge)
-- For discount lines like "RABATT 20%  -0.36": qty=1, price=-0.36 (negative item)
+DISCOUNT RULES (German receipts use many discount keywords — get these right):
+- INCLUDE as a negative line item (qty=1, price=negative amount) when a discount appears BETWEEN items in the item list:
+  e.g. "RABATT  -0,36", "Preisvorteil  -0,20", "COUPON  -0,50", "Treuerabatt  -0,30", "Gutschein  -1,00", "Aktion  -0,15", "Sofortrabatt  -0,40"
+  Use the euro amount shown (negative). If only a percentage is shown with no euro amount, skip it.
+- SKIP summary/footer savings lines — these are informational and the item prices already reflect the discount:
+  e.g. "Ihr Preisvorteil heute: 2,50 EUR", "Sie sparten: 1,20 EUR", "Gesamtersparnis: 3,40 EUR", "Preisvorteil gesamt"
+  The difference: footer lines say "you saved X in total today" and appear after all items near the payment section. Inline discounts appear right next to specific items in the item list and have a minus sign in the price column.
 - NEVER use the line total as the price when qty > 1. If "2 x 1.95" gives a line total of "3.90", price=1.95 not 3.90.
 - Skip tax summary rows, subtotals, payment lines, barcodes, store address lines
 - Translate German item names to clear English (e.g. "Ganzes Hähnchen" → "Whole chicken")
@@ -140,7 +146,12 @@ ${alreadyFound}
 
 The receipt total is €${receiptTotal.toFixed(2)}, so there is a gap of €${gap.toFixed(2)} unaccounted for.
 
-Please look at the receipt again very carefully and find ONLY the items that are missing from the list above. Look for any line items I may have skipped — non-food items like socks, bags, batteries, household goods are easy to miss. Do NOT repeat items already listed.
+Please look at the receipt again very carefully and find ONLY the items that are missing from the list above. Look especially for:
+- Inline discount lines (e.g. "Preisvorteil -0,20", "RABATT -0,36", "COUPON -0,50", "Sofortrabatt -0,40") that appear in the item list with a minus sign — these must be included as negative-price items
+- Non-food items like socks, bags, batteries, household goods that are easy to miss
+- Any other priced line between the first and last item that was skipped
+Do NOT include footer/summary savings lines like "Ihr Preisvorteil heute" or "Sie sparten" — only inline discounts with a minus sign in the price column.
+Do NOT repeat items already listed.
 
 Return ONLY a JSON array of the missing items (no store/date/total wrapper):
 [{ "name": "...", "qty": 1, "price": 0.00, "category": "...", "dietary_tags": [] }]`,
