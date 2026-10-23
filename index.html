@@ -917,7 +917,7 @@ async function enterApp(trip){
 //  App state + helpers
 // ─────────────────────────────────────────────────────────────────────────────
 let TRIP_START=null, TRIP_END=null, TRIP_NAME="";
-const CATS = ["Consumables","House Supplies","Veggies","Meat","Alcohol"];
+const CATS = ["Veggies","Meat","Dairy","Bread","Drinks","Alcohol","Snacks","Frozen","Consumables","House Supplies"];
 let MEMBERS=[], receipts=[], calendarFilter=null;
 
 function dateList(s,e){ const out=[]; let d=new Date(s+"T00:00:00Z"), ed=new Date(e+"T00:00:00Z"); while(d<=ed){ out.push(d.toISOString().slice(0,10)); d=new Date(d.getTime()+86400000); } return out; }
@@ -1270,17 +1270,48 @@ document.getElementById("af-photo-input").addEventListener("change",e=>afHandleF
 ["dragleave","drop"].forEach(ev=>uploadZone.addEventListener(ev,e=>{ e.preventDefault();uploadZone.classList.remove("drag"); }));
 uploadZone.addEventListener("drop",e=>afHandleFile(e.dataTransfer.files[0]));
 
-document.getElementById("af-scan-btn").onclick=()=>{
+document.getElementById("af-scan-btn").onclick=async()=>{
   const st=document.getElementById("af-scan-status"),btn=document.getElementById("af-scan-btn");
-  btn.disabled=true;st.className="scan-status busy";st.innerHTML=`<span class="spinner"></span> Scanning receipt…`;
-  setTimeout(()=>{
-    const picked=[...OCR_POOL].sort(()=>Math.random()-0.5).slice(0,4+Math.floor(Math.random()*4));
-    afItems=picked.map(it=>({n:it.n,qty:1,price:it.price,c:it.c}));afRenderItems();afUpdateTotal();
-    document.getElementById("af-store").value="Sample store";
-    const days=TRIP_DATES;document.getElementById("af-date").value=days.length?days[Math.floor(Math.random()*days.length)]:"";
-    st.className="scan-status done";st.textContent=`Scanned ${picked.length} items — check before saving.`;
-    btn.disabled=false;btn.textContent="Re-scan";
-  },1100);
+  if(!afPhotoFile){ st.textContent="No photo attached."; return; }
+  btn.disabled=true; st.className="scan-status busy"; st.innerHTML=`<span class="spinner"></span> Reading receipt with AI…`;
+  try {
+    // Convert file to base64
+    const toBase64 = f => new Promise((res,rej)=>{ const r=new FileReader(); r.onload=e=>res(e.target.result.split(",")[1]); r.onerror=rej; r.readAsDataURL(f); });
+    const image_base64 = await toBase64(afPhotoFile);
+    const media_type = afPhotoFile.type || "image/jpeg";
+
+    const { data:{ session } } = await sbClient.auth.getSession();
+    const token = session?.access_token;
+
+    const supabaseUrl = sbClient.supabaseUrl || DEFAULT_SUPABASE_URL;
+    const resp = await fetch(`${supabaseUrl}/functions/v1/parse-receipt`, {
+      method: "POST",
+      headers: { "Content-Type":"application/json", "Authorization":`Bearer ${token}` },
+      body: JSON.stringify({ image_base64, media_type }),
+    });
+    if(!resp.ok){ const e=await resp.text(); throw new Error(e); }
+    const parsed = await resp.json();
+
+    // Populate form with parsed data
+    if(parsed.store) document.getElementById("af-store").value = parsed.store;
+    if(parsed.date) document.getElementById("af-date").value = parsed.date;
+
+    const validCats = new Set(CATS);
+    afItems = (parsed.items||[]).map(it=>({
+      n: it.name||"",
+      qty: Number(it.qty)||1,
+      price: Number(it.price)||0,
+      c: validCats.has(it.category) ? it.category : "Consumables",
+    })).filter(it=>it.n && it.price!==0);
+
+    afRenderItems(); afUpdateTotal();
+    st.className="scan-status done";
+    st.textContent=`Found ${afItems.length} items — check and save.`;
+  } catch(err){
+    st.className="scan-status"; st.style.color="var(--clay)";
+    st.textContent="Scan failed: "+err.message;
+  }
+  btn.disabled=false; btn.textContent="Re-scan";
 };
 
 function afRenderItems(){
