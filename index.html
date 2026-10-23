@@ -259,6 +259,9 @@
   .item-build-row{ display:grid; grid-template-columns:1fr 46px 66px 108px 26px; gap:6px; align-items:center; margin-bottom:6px; }
   .item-build-row input, .item-build-row select{ font-family:'IBM Plex Sans',sans-serif; font-size:12px; padding:6px 7px; border:1px solid var(--line); border-radius:3px; }
   .item-build-row .rm{ background:none; border:none; color:var(--clay); font-size:15px; cursor:pointer; }
+  .payer-row{ display:grid; grid-template-columns:1fr 80px 26px; gap:6px; align-items:center; margin-bottom:6px; }
+  .payer-row select, .payer-row input{ font-family:'IBM Plex Sans',sans-serif; font-size:12px; padding:6px 7px; border:1px solid var(--line); border-radius:3px; }
+  .payer-row .rm{ background:none; border:none; color:var(--clay); font-size:15px; cursor:pointer; }
   .item-build-row.qty-multi{ background:rgba(255,180,0,0.08); border-radius:4px; outline:1px solid rgba(255,160,0,0.35); padding:2px 4px; margin-left:-4px; }
   .add-item-btn{ font-family:'IBM Plex Mono',monospace; font-size:11.5px; background:none; border:1px dashed var(--line); color:var(--ink-soft); padding:7px 10px; border-radius:3px; cursor:pointer; width:100%; margin-top:2px; }
   .add-item-btn:hover{ border-color:var(--pine); color:var(--pine); }
@@ -641,8 +644,11 @@
     <input type="text" id="af-store" placeholder="e.g. Corner Market">
     <label class="af-label">Date</label>
     <input type="date" id="af-date">
-    <label class="af-label">Paid by</label>
-    <select id="af-buyer"><option value="">— not yet claimed —</option></select>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin:10px 0 4px;">
+      <label class="af-label" style="margin:0;">Paid by</label>
+      <button type="button" id="af-add-payer-btn" style="font-size:11px;color:var(--pine);background:none;border:none;cursor:pointer;padding:0;font-family:inherit;">+ split payment</button>
+    </div>
+    <div id="af-payers-list"></div>
     <div id="groceryFields">
       <label class="af-label">Items</label>
       <div id="af-items"></div>
@@ -1051,7 +1057,7 @@ function clearStatus(){ const el=document.getElementById("statusBanner");el.clas
 
 function mapMemberRow(r){ return{id:r.id,name:r.name,email:r.email||"",arrive:r.arrive_date,depart:r.depart_date,diet:r.diet||"meat",drinks:r.drinks,meals:r.meals,no_dairy:r.no_dairy||false,no_gluten:r.no_gluten||false}; }
 function mapItemRow(r){ return{id:r.id,name:r.name,qty:r.qty,price:Number(r.price),category:r.category,dietary_tags:r.dietary_tags||[],claimed_by:r.claimed_by,claimed_amount:r.claimed_amount!=null?Number(r.claimed_amount):null}; }
-function mapReceiptRow(r){ return{id:r.id,store:r.store,date:r.date,total:Number(r.total),buyer_id:r.buyer_id,kind:r.kind||"grocery",attendees:r.attendees||[],photo_url:r.photo_url||null,items:(r.line_items||[]).map(mapItemRow)}; }
+function mapReceiptRow(r){ return{id:r.id,store:r.store,date:r.date,total:Number(r.total),buyer_id:r.buyer_id,payers:r.payers||null,kind:r.kind||"grocery",attendees:r.attendees||[],photo_url:r.photo_url||null,items:(r.line_items||[]).map(mapItemRow)}; }
 
 async function loadMembers(){ const{data,error}=await sbClient.from("members").select("*").eq("trip_id",currentTripId).order("name"); if(error)throw error; return data.map(mapMemberRow); }
 async function loadReceipts(){ const{data,error}=await sbClient.from("receipts").select("*,line_items(*)").eq("trip_id",currentTripId).order("date"); if(error)throw error; return data.map(mapReceiptRow); }
@@ -1150,7 +1156,9 @@ function renderGrid(){
     const isR=r.kind==="restaurant",isC=r.kind==="custom",isA=r.kind==="accommodation";
     const isDup=keyCounts[dupKey(r)]>1;
     const card=document.createElement("div"); card.className="receipt"+(isDup?" duplicate":"");
-    const buyerName=memberName(r.buyer_id);
+    const buyerDisplay=r.payers&&r.payers.length>0
+      ? r.payers.map(p=>memberName(p.member_id)).filter(Boolean).join(" + ")
+      : memberName(r.buyer_id);
     let bHtml,sHtml;
     if(isA){ const att=r.attendees||{};const ppl=att.people||[];const checkout=att.checkout||"?";const nights=r.date&&att.checkout?dateDiffNights(r.date,checkout):0;bHtml=`<div class="brow"><span class="lbl"><span class="swatch" style="background:var(--pine);"></span>🏠 Accommodation</span><span class="amt">${nights} night${nights===1?"":"s"}, ${ppl.length} people</span></div>`;sHtml=`<span class="dot ${ppl.length>0?"done":""}"></span>${ppl.length?ppl.length+" staying":"no guests set"}`; }
     else if(isR){ const att=r.attendees||[];const ppl=Array.isArray(att)?att:(att.people||[]);const mode=Array.isArray(att)?"even":(att.mode||"even");const n=ppl.length;bHtml=`<div class="brow"><span class="lbl"><span class="swatch" style="background:var(--amber);"></span>🍽️ Restaurant tab</span><span class="amt">${mode==="per_dish"?"per dish":"split "+n+" way"+(n===1?"":"s")}</span></div>`;sHtml=`<span class="dot ${n>0?"done":""}"></span>${n?n+" people attending":"no attendees set"}`; }
@@ -1162,7 +1170,7 @@ function renderGrid(){
       const dc=cl===0?"":(cl<r.items.length?"partial":"done");
       sHtml=`<span class="dot ${dc}"></span>${cl?cl+" item(s) claimed":"nothing claimed yet"}`;
     }
-    card.innerHTML=`<div class="rid">#${shortId(r.id)}</div><div class="store">${r.store}${r.photo_url?" 📷":""}<span class="dup-badge">Already scanned</span></div><div class="date ${r.date?"":"unassigned"}">${r.date?fmtDate(r.date):"needs a date"}</div><div class="buyer">${buyerName?"Paid by "+buyerName:""}</div><div class="total">€${r.total.toFixed(2)}</div><div class="breakdown">${bHtml}</div><div class="claim-status">${sHtml}</div>`;
+    card.innerHTML=`<div class="rid">#${shortId(r.id)}</div><div class="store">${r.store}${r.photo_url?" 📷":""}<span class="dup-badge">Already scanned</span></div><div class="date ${r.date?"":"unassigned"}">${r.date?fmtDate(r.date):"needs a date"}</div><div class="buyer">${buyerDisplay?"Paid by "+buyerDisplay:""}</div><div class="total">€${r.total.toFixed(2)}</div><div class="breakdown">${bHtml}</div><div class="claim-status">${sHtml}</div>`;
     card.onclick=()=>openPanel(r);
     grid.appendChild(card);
   });
@@ -1198,8 +1206,18 @@ function openPanel(r){
   document.getElementById("dateRow").classList.toggle("needs-date",!r.date);
   di.onchange=async()=>{ r.date=di.value||null;document.getElementById("dateRow").classList.toggle("needs-date",!r.date);renderGrid();renderCalendar();updateFooter(r);await sbClient.from("receipts").update({date:r.date}).eq("id",r.id); };
   const bs=document.getElementById("buyerSelect");
-  bs.innerHTML=`<option value="">— not yet claimed —</option>`+MEMBERS.map(m=>`<option value="${m.id}" ${r.buyer_id===m.id?"selected":""}>${m.name}</option>`).join("");
-  bs.onchange=async()=>{ r.buyer_id=bs.value||null;renderGrid();await sbClient.from("receipts").update({buyer_id:r.buyer_id}).eq("id",r.id); };
+  if(r.payers&&r.payers.length>1){
+    // Multi-payer: show read-only summary instead of single select
+    bs.style.display="none";
+    let pw=document.getElementById("panel-payers-wrap");
+    if(!pw){ pw=document.createElement("div");pw.id="panel-payers-wrap";pw.style.cssText="font-size:12px;margin-top:2px;";bs.parentNode.insertBefore(pw,bs); }
+    pw.innerHTML=r.payers.map(p=>`<div style="display:flex;justify-content:space-between;padding:2px 0;"><span>${memberName(p.member_id)||"?"}</span><span style="font-family:'IBM Plex Mono',monospace;">€${Number(p.amount).toFixed(2)}</span></div>`).join("");
+  } else {
+    bs.style.display="";
+    const pw=document.getElementById("panel-payers-wrap"); if(pw) pw.innerHTML="";
+    bs.innerHTML=`<option value="">— not yet claimed —</option>`+MEMBERS.map(m=>`<option value="${m.id}" ${r.buyer_id===m.id?"selected":""}>${m.name}</option>`).join("");
+    bs.onchange=async()=>{ r.buyer_id=bs.value||null;renderGrid();await sbClient.from("receipts").update({buyer_id:r.buyer_id}).eq("id",r.id); };
+  }
   document.getElementById("deleteReceiptBtn").onclick=async()=>{
     if(!confirm(`Delete #${shortId(r.id)} — ${r.store}? Can't be undone.`)) return;
     const{error}=await sbClient.from("receipts").delete().eq("id",r.id);
@@ -1514,7 +1532,8 @@ function computeSettlement(){
   const credit={},debit={};
   MEMBERS.forEach(m=>{ credit[m.id]=0;debit[m.id]=0; });
   receipts.forEach(r=>{
-    if(r.buyer_id) credit[r.buyer_id]=(credit[r.buyer_id]||0)+r.total;
+    if(r.payers&&r.payers.length>0){ r.payers.forEach(p=>{ if(p.member_id) credit[p.member_id]=(credit[p.member_id]||0)+p.amount; }); }
+    else if(r.buyer_id){ credit[r.buyer_id]=(credit[r.buyer_id]||0)+r.total; }
     if(r.kind==="restaurant"){
       const att=r.attendees||[];
       if(Array.isArray(att)){
@@ -1576,7 +1595,7 @@ function renderSettlement(){
 
 // ── Add receipt form ──────────────────────────────────────────────────────────
 const OCR_POOL=[{n:"Sample vegetables",price:3.20,c:"Veggies"},{n:"Sample cheese",price:3.55,c:"Consumables"},{n:"Sample chicken",price:6.20,c:"Meat"},{n:"Sample water pack",price:2.50,c:"Consumables"},{n:"Sample beer",price:4.40,c:"Alcohol"},{n:"Sample paper towels",price:4.10,c:"House Supplies"}];
-let afPhotoFile=null,afItems=[],afKind="grocery",afReceiptTotal=0;
+let afPhotoFile=null,afItems=[],afKind="grocery",afReceiptTotal=0,afPayers=[];
 
 function afResetUpload(){ afPhotoFile=null;afReceiptTotal=0;document.getElementById("af-scan-compare").style.display="none";document.getElementById("af-photo-input").value="";document.getElementById("af-photo-preview").style.display="none";document.getElementById("af-photo-preview").src="";document.getElementById("af-upload-placeholder").style.display="";document.getElementById("af-scan-btn").style.display="none";document.getElementById("af-scan-btn").textContent="Scan receipt";const s=document.getElementById("af-scan-status");s.className="scan-status";s.textContent=""; }
 
@@ -1716,6 +1735,49 @@ document.getElementById("af-scan-btn").onclick=async()=>{
   btn.disabled=false; btn.textContent="Re-scan";
 };
 
+function afCurrentTotal(){
+  if(afKind==="grocery") return Math.round(afItems.reduce((s,it)=>s+(it.qty*it.price||0),0)*100)/100;
+  if(afKind==="restaurant") return parseFloat(document.getElementById("af-restaurant-amount")?.value)||0;
+  if(afKind==="accommodation") return parseFloat(document.getElementById("af-accommodation-amount")?.value)||0;
+  return 0;
+}
+
+function renderAfPayers(){
+  const wrap=document.getElementById("af-payers-list"); if(!wrap) return;
+  wrap.innerHTML="";
+  const total=afCurrentTotal();
+  const multi=afPayers.length>1;
+  afPayers.forEach((p,idx)=>{
+    const row=document.createElement("div"); row.className="payer-row";
+    const memberOpts=`<option value="">— not claimed —</option>`+MEMBERS.map(m=>`<option value="${m.id}"${p.memberId===m.id?" selected":""}>${m.name}</option>`).join("");
+    const amtCell=multi
+      ? `<input type="number" class="pr-amount" min="0" step="0.01" placeholder="€" value="${p.amount||""}">`
+      : `<span style="font-size:12px;color:var(--ink-soft);padding:0 4px;">${total>0?"€"+total.toFixed(2):""}</span>`;
+    const rmCell=multi&&afPayers.length>1
+      ? `<button type="button" class="rm pr-rm">✕</button>`
+      : `<span></span>`;
+    row.innerHTML=`<select class="pr-member">${memberOpts}</select>${amtCell}${rmCell}`;
+    row.querySelector(".pr-member").onchange=e=>{ afPayers[idx].memberId=e.target.value; };
+    if(multi){
+      row.querySelector(".pr-amount").oninput=e=>{ afPayers[idx].amount=parseFloat(e.target.value)||0; };
+      if(afPayers.length>1) row.querySelector(".pr-rm").onclick=()=>{ afPayers.splice(idx,1); renderAfPayers(); };
+    }
+    wrap.appendChild(row);
+  });
+}
+
+document.getElementById("af-add-payer-btn").onclick=()=>{
+  const total=afCurrentTotal();
+  if(afPayers.length===1){
+    const half=Math.round(total/2*100)/100;
+    afPayers[0].amount=half;
+    afPayers.push({memberId:"",amount:Math.round((total-half)*100)/100});
+  } else {
+    afPayers.push({memberId:"",amount:0});
+  }
+  renderAfPayers();
+};
+
 function afRenderItems(){
   const wrap=document.getElementById("af-items");wrap.innerHTML="";
   afItems.forEach((it,idx)=>{
@@ -1757,6 +1819,8 @@ function afUpdateTotal(){
   else if(afKind==="restaurant"){ if(afRestaurantMode==="per_dish") t=afDishes.reduce((s,d)=>s+(d.price||0),0); else t=parseFloat(document.getElementById("af-restaurant-amount").value)||0; }
   else if(afKind==="accommodation") t=parseFloat(document.getElementById("af-accommodation-amount").value)||0;
   document.getElementById("af-total-amt").textContent="€"+t.toFixed(2);
+  // Keep single-payer amount display in sync
+  if(afPayers.length===1){ afPayers[0].amount=Math.round(t*100)/100; renderAfPayers(); }
   // Update the compare panel if a receipt total was parsed
   const cmp=document.getElementById("af-scan-compare");
   if(afReceiptTotal>0 && cmp){
@@ -1822,8 +1886,8 @@ function openAddPanel(){
   document.querySelectorAll("#splitModeToggle .kind-btn").forEach(b=>b.classList.toggle("active",b.dataset.mode==="even"));
   document.getElementById("evenSplitSection").style.display=""; document.getElementById("perDishSection").style.display="none";
   document.getElementById("af-store-label").textContent="Store / vendor"; document.getElementById("af-store").placeholder="e.g. Corner Market";
-  document.getElementById("af-buyer").innerHTML=`<option value="">— not yet claimed —</option>`+MEMBERS.map(m=>`<option value="${m.id}">${m.name}</option>`).join("");
-  afItems=[{n:"",qty:1,price:0,c:"Consumables"}];afRenderItems();afRenderAttendees();afRenderAccAttendees();afUpdateTotal();
+  afPayers=[{memberId:"",amount:0}];
+  afItems=[{n:"",qty:1,price:0,c:"Consumables"}];afRenderItems();afRenderAttendees();afRenderAccAttendees();renderAfPayers();afUpdateTotal();
   document.getElementById("overlay2").classList.add("open"); document.getElementById("panel2").classList.add("open");
 }
 function closeAddPanel(){ document.getElementById("overlay2").classList.remove("open"); document.getElementById("panel2").classList.remove("open"); }
@@ -1835,8 +1899,10 @@ document.getElementById("af-cancel").onclick=closeAddPanel;
 document.getElementById("af-add-item").onclick=()=>{ afItems.push({n:"",qty:1,price:0,c:"Consumables"});afRenderItems(); };
 
 document.getElementById("af-save").onclick=async()=>{
-  const store=document.getElementById("af-store").value.trim(),buyerId=document.getElementById("af-buyer").value||null;
+  const store=document.getElementById("af-store").value.trim();
   if(!store){ alert("Add a store or venue name."); return; }
+  const payersPayload=afPayers.filter(p=>p.memberId).map(p=>({member_id:p.memberId,amount:p.amount}));
+  const buyerId=payersPayload.length>0?payersPayload[0].member_id:null;
   let total,cleanItems=null,attendeesPayload=null,dateVal=null;
   if(afKind==="grocery"){
     dateVal=document.getElementById("af-date").value||null;
@@ -1873,7 +1939,7 @@ document.getElementById("af-save").onclick=async()=>{
   const btn=document.getElementById("af-save");btn.disabled=true;btn.textContent="Saving…";
   let photoUrl=null;
   if(afPhotoFile){ try{ photoUrl=await uploadReceiptPhoto(afPhotoFile); }catch(err){ console.error(err); } }
-  const payload={trip_id:currentTripId,store,date:dateVal,total,buyer_id:buyerId,kind:afKind,photo_url:photoUrl};
+  const payload={trip_id:currentTripId,store,date:dateVal,total,buyer_id:buyerId,kind:afKind,photo_url:photoUrl,payers:payersPayload.length>0?payersPayload:null};
   if(afKind==="restaurant"||afKind==="accommodation") payload.attendees=attendeesPayload;
   const{data:nr,error:e1}=await sbClient.from("receipts").insert(payload).select().single();
   if(e1){ alert("Couldn't save: "+e1.message);btn.disabled=false;btn.textContent="Save receipt";return; }
