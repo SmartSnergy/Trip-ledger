@@ -249,10 +249,10 @@
   .panel-foot .row.total{ font-weight:700; color:var(--ink); font-size:14px; margin-top:6px; }
 
   /* ── Add-receipt form ── */
-  .add-form{ padding:18px 22px; }
+  .add-form{ padding:18px 22px; box-sizing:border-box; }
   .af-label{ font-size:11px; color:var(--ink-soft); display:block; margin:12px 0 4px; }
   .af-label:first-child{ margin-top:0; }
-  .add-form input[type=text], .add-form input[type=date], .add-form select{ width:100%; font-family:'IBM Plex Sans',sans-serif; font-size:13px; padding:8px 9px; border:1px solid var(--line); border-radius:3px; background:#fff; color:var(--ink); }
+  .add-form input[type=text], .add-form input[type=date], .add-form input[type=number], .add-form select{ width:100%; box-sizing:border-box; font-family:'IBM Plex Sans',sans-serif; font-size:13px; padding:8px 9px; border:1px solid var(--line); border-radius:3px; background:#fff; color:var(--ink); }
   .item-build-row{ display:grid; grid-template-columns:1fr 46px 66px 108px 26px; gap:6px; align-items:center; margin-bottom:6px; }
   .item-build-row input, .item-build-row select{ font-family:'IBM Plex Sans',sans-serif; font-size:12px; padding:6px 7px; border:1px solid var(--line); border-radius:3px; }
   .item-build-row .rm{ background:none; border:none; color:var(--clay); font-size:15px; cursor:pointer; }
@@ -262,7 +262,7 @@
   .af-actions{ display:flex; gap:8px; margin-top:16px; }
   .af-actions .save{ flex:1; }
   .af-actions .cancel{ flex:none; }
-  .upload-zone{ border:1.5px dashed var(--line); border-radius:5px; padding:18px; text-align:center; cursor:pointer; background:#fff; transition:border-color .15s ease, background .15s ease; }
+  .upload-zone{ border:1.5px dashed var(--line); border-radius:5px; padding:14px 12px; text-align:center; cursor:pointer; background:var(--paper); transition:border-color .15s ease, background .15s ease; display:block; width:100%; box-sizing:border-box; }
   .upload-zone.drag{ border-color:var(--pine); background:var(--pine-soft); }
   .visually-hidden{ position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
   .upload-icon{ font-size:22px; margin-bottom:4px; }
