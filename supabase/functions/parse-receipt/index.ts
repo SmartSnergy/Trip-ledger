@@ -102,7 +102,7 @@ Deno.serve(async (req) => {
         role: "user",
         content: [
           imageContent(image_base64, mt),
-          { type: "text", text: "Parse this receipt and return the JSON." },
+          { type: "text", text: "Before parsing, check the orientation — receipts are normally portrait (taller than wide) with text reading left-to-right. If this image is rotated 90°, 180°, or 270°, read it in the correct upright orientation. Then parse and return the JSON." },
         ],
       }],
     });
