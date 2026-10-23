@@ -579,6 +579,13 @@
     </label>
     <button class="add-btn scan-btn" id="af-scan-btn" style="display:none;">Scan receipt</button>
     <div class="scan-status" id="af-scan-status"></div>
+    <div id="af-custom-cats-section" style="display:none;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin:10px 0 4px;">
+        <label class="af-label" style="margin:0;">Custom categories</label>
+        <button type="button" id="af-add-cat-btn" style="font-size:11px;color:var(--pine);background:none;border:none;cursor:pointer;padding:0;font-family:inherit;">+ add</button>
+      </div>
+      <div id="af-cat-list"></div>
+    </div>
     <label class="af-label" id="af-store-label">Store / vendor</label>
     <input type="text" id="af-store" placeholder="e.g. Corner Market">
     <label class="af-label">Date</label>
@@ -941,7 +948,14 @@ async function enterApp(trip){
 //  App state + helpers
 // ─────────────────────────────────────────────────────────────────────────────
 let TRIP_START=null, TRIP_END=null, TRIP_NAME="";
-const CATS = ["Fruit","Veggies","Meat","Eggs","Dairy","Bread","Drinks","Alcohol","Snacks","Frozen","Consumables","House Supplies"];
+const CATS_BASE = ["Fruit","Veggies","Meat","Eggs","Dairy","Bread","Drinks","Alcohol","Snacks","Frozen","Consumables","House Supplies"];
+// Custom categories: [{name, description, enabled}] — persisted in localStorage
+let customCats = [];
+function loadCustomCats(){ try{ customCats=JSON.parse(localStorage.getItem("tl_custom_cats")||"[]"); }catch(_){ customCats=[]; } }
+function saveCustomCats(){ try{ localStorage.setItem("tl_custom_cats",JSON.stringify(customCats)); }catch(_){} }
+loadCustomCats();
+function allCats(){ return [...CATS_BASE, ...customCats.map(c=>c.name)]; }
+const CATS = CATS_BASE; // kept for backward compat — use allCats() for dropdowns
 let MEMBERS=[], receipts=[], calendarFilter=null;
 
 function dateList(s,e){ const out=[]; let d=new Date(s+"T00:00:00Z"), ed=new Date(e+"T00:00:00Z"); while(d<=ed){ out.push(d.toISOString().slice(0,10)); d=new Date(d.getTime()+86400000); } return out; }
@@ -1368,6 +1382,46 @@ document.getElementById("af-photo-input").addEventListener("change",e=>afHandleF
 ["dragleave","drop"].forEach(ev=>uploadZone.addEventListener(ev,e=>{ e.preventDefault();uploadZone.classList.remove("drag"); }));
 uploadZone.addEventListener("drop",e=>afHandleFile(e.dataTransfer.files[0]));
 
+// ── Custom categories UI ──────────────────────────────────────────────────────
+function renderCustomCats(){
+  const sec=document.getElementById("af-custom-cats-section");
+  const list=document.getElementById("af-cat-list");
+  sec.style.display=customCats.length?"block":"none";
+  list.innerHTML="";
+  customCats.forEach((cat,idx)=>{
+    const row=document.createElement("div");
+    row.style.cssText="display:flex;align-items:center;gap:8px;margin-bottom:6px;";
+    row.innerHTML=`<input type="checkbox" id="cc${idx}" ${cat.enabled!==false?"checked":""} style="flex-shrink:0;cursor:pointer;">
+      <label for="cc${idx}" style="flex:1;font-size:13px;cursor:pointer;" title="${cat.description||""}">${cat.name}${cat.description?` <span style="color:var(--ink-soft);font-size:11px;">— ${cat.description}</span>`:""}</label>
+      <button type="button" data-rmi="${idx}" style="font-size:11px;color:var(--clay);background:none;border:none;cursor:pointer;padding:2px 4px;flex-shrink:0;">✕</button>`;
+    row.querySelector("input").onchange=e=>{ customCats[idx].enabled=e.target.checked; saveCustomCats(); };
+    row.querySelector("[data-rmi]").onclick=()=>{ customCats.splice(idx,1); saveCustomCats(); renderCustomCats(); };
+    list.appendChild(row);
+  });
+}
+renderCustomCats();
+
+document.getElementById("af-add-cat-btn").onclick=()=>{
+  const sec=document.getElementById("af-custom-cats-section");
+  sec.style.display="block";
+  const list=document.getElementById("af-cat-list");
+  const row=document.createElement("div");
+  row.style.cssText="display:flex;gap:6px;margin-bottom:6px;";
+  row.innerHTML=`<input type="text" placeholder="Category name" style="flex:1;font-size:12px;padding:5px 7px;border:1px solid var(--line);border-radius:4px;">
+    <input type="text" placeholder="What goes here?" style="flex:2;font-size:12px;padding:5px 7px;border:1px solid var(--line);border-radius:4px;">
+    <button type="button" style="font-size:11px;background:var(--pine);color:#fff;border:none;border-radius:4px;padding:5px 9px;cursor:pointer;">Add</button>`;
+  const [nameEl,descEl,addBtn]=row.querySelectorAll("input,button");
+  addBtn.onclick=()=>{
+    const name=nameEl.value.trim(), desc=descEl.value.trim();
+    if(!name) return;
+    customCats.push({name,description:desc,enabled:true});
+    saveCustomCats(); row.remove(); renderCustomCats();
+  };
+  nameEl.onkeydown=descEl.onkeydown=e=>{ if(e.key==="Enter") addBtn.click(); };
+  list.appendChild(row);
+  nameEl.focus();
+};
+
 document.getElementById("af-scan-btn").onclick=async()=>{
   const st=document.getElementById("af-scan-status"),btn=document.getElementById("af-scan-btn");
   if(!afPhotoFile){ st.textContent="No photo attached."; return; }
@@ -1385,7 +1439,7 @@ document.getElementById("af-scan-btn").onclick=async()=>{
     const resp = await fetch(`${supabaseUrl}/functions/v1/parse-receipt`, {
       method: "POST",
       headers: { "Content-Type":"application/json", "Authorization":`Bearer ${token}` },
-      body: JSON.stringify({ image_base64, media_type }),
+      body: JSON.stringify({ image_base64, media_type, custom_categories: customCats.filter(c=>c.enabled!==false).map(c=>({name:c.name,description:c.description})) }),
     });
     if(!resp.ok){ const e=await resp.text(); throw new Error(e); }
     const parsed = await resp.json();
@@ -1394,7 +1448,7 @@ document.getElementById("af-scan-btn").onclick=async()=>{
     if(parsed.store) document.getElementById("af-store").value = parsed.store;
     if(parsed.date) document.getElementById("af-date").value = parsed.date;
 
-    const validCats = new Set(CATS);
+    const validCats = new Set(allCats());
     afItems = (parsed.items||[]).map(it=>({
       n: it.name||"",
       qty: Number(it.qty)||1,
@@ -1426,7 +1480,7 @@ function afRenderItems(){
   const wrap=document.getElementById("af-items");wrap.innerHTML="";
   afItems.forEach((it,idx)=>{
     const row=document.createElement("div");row.className="item-build-row";
-    row.innerHTML=`<input type="text" placeholder="Item name" value="${it.n}" data-f="n"><input type="number" min="1" step="1" placeholder="Qty" value="${it.qty}" data-f="qty"><input type="number" min="0" step="0.01" placeholder="€ ea" value="${it.price}" data-f="price"><select data-f="c">${CATS.map(c=>`<option ${it.c===c?"selected":""}>${c}</option>`).join("")}</select><button class="rm" data-rm="${idx}">✕</button>`;
+    row.innerHTML=`<input type="text" placeholder="Item name" value="${it.n}" data-f="n"><input type="number" min="1" step="1" placeholder="Qty" value="${it.qty}" data-f="qty"><input type="number" min="0" step="0.01" placeholder="€ ea" value="${it.price}" data-f="price"><select data-f="c">${allCats().map(c=>`<option ${it.c===c?"selected":""}>${c}</option>`).join("")}</select><button class="rm" data-rm="${idx}">✕</button>`;
     row.querySelectorAll("[data-f]").forEach(el=>{ const h=()=>{ const f=el.dataset.f;afItems[idx][f]=(f==="qty"||f==="price")?parseFloat(el.value)||0:el.value;afUpdateTotal(); };el.addEventListener("input",h);el.addEventListener("change",h); });
     row.querySelector("[data-rm]").onclick=()=>{ afItems.splice(idx,1);afRenderItems();afUpdateTotal(); };
     wrap.appendChild(row);

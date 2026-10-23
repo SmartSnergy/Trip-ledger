@@ -73,16 +73,31 @@ Deno.serve(async (req) => {
     const auth = req.headers.get("Authorization");
     if (!auth) return new Response("Unauthorized", { status: 401, headers: corsHeaders });
 
-    const { image_base64, media_type } = await req.json();
+    const { image_base64, media_type, custom_categories } = await req.json();
     if (!image_base64) return new Response(JSON.stringify({ error: "No image provided" }), { status: 400, headers: corsHeaders });
 
     const mt = media_type || "image/jpeg";
+
+    // Build system content: cached base prompt + optional custom categories
+    type SystemBlock = { type: "text"; text: string; cache_control?: { type: "ephemeral" } };
+    const systemContent: SystemBlock[] = [
+      { type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } },
+    ];
+    if (Array.isArray(custom_categories) && custom_categories.length > 0) {
+      const extra = custom_categories
+        .map((c: { name: string; description: string }) => `- "${c.name}" — ${c.description}`)
+        .join("\n");
+      systemContent.push({
+        type: "text",
+        text: `\nAdditional custom categories (use these when items clearly match — prefer over standard categories when applicable):\n${extra}`,
+      });
+    }
 
     // ── First pass: full parse ────────────────────────────────────────────────
     const firstResp = await client.messages.create({
       model: "claude-haiku-4-5",
       max_tokens: 2048,
-      system: SYSTEM_PROMPT,
+      system: systemContent as any,
       messages: [{
         role: "user",
         content: [
@@ -109,7 +124,7 @@ Deno.serve(async (req) => {
       const secondResp = await client.messages.create({
         model: "claude-haiku-4-5",
         max_tokens: 1024,
-        system: SYSTEM_PROMPT,
+        system: systemContent as any,
         messages: [{
           role: "user",
           content: [
