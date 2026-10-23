@@ -1818,7 +1818,7 @@ document.getElementById("af-save").onclick=async()=>{
   let total,cleanItems=null,attendeesPayload=null,dateVal=null;
   if(afKind==="grocery"){
     dateVal=document.getElementById("af-date").value||null;
-    cleanItems=afItems.filter(it=>it.n.trim()&&it.price>0).map(it=>({name:it.qty>1?`${it.n} ×${it.qty}`:it.n,price:Math.round(it.qty*it.price*100)/100,category:it.c,dietary_tags:it.dietary_tags||[]}));
+    cleanItems=afItems.filter(it=>it.n.trim()&&it.price!==0).map(it=>({name:it.qty>1?`${it.n} ×${it.qty}`:it.n,price:Math.round(it.qty*it.price*100)/100,category:it.c,dietary_tags:it.dietary_tags||[]}));
     if(!cleanItems.length){ alert("Add at least one item with a name and a price."); return; }
     total=Math.round(cleanItems.reduce((s,it)=>s+it.price,0)*100)/100;
   } else if(afKind==="restaurant"){
