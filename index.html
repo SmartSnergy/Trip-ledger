@@ -1630,71 +1630,24 @@ document.getElementById("af-scan-btn").onclick=async()=>{
   if(!afPhotoFile){ st.textContent="No photo attached."; return; }
   btn.disabled=true; st.className="scan-status busy"; st.innerHTML=`<span class="spinner"></span> Reading receipt with AI…`;
   try {
-    // Read EXIF orientation and correct rotation before encoding
-    const correctOrientation = (file) => new Promise((res, rej) => {
-      const reader = new FileReader();
-      reader.onerror = rej;
-      reader.onload = e => {
-        const buf = e.target.result;
-        let orientation = 1;
-        // Parse EXIF orientation from JPEG only
-        if (file.type === "image/jpeg" || file.type === "image/jpg") {
-          try {
-            const view = new DataView(buf);
-            if (view.getUint16(0) === 0xFFD8) { // JPEG magic bytes
-              let offset = 2;
-              while (offset < view.byteLength) {
-                const marker = view.getUint16(offset);
-                offset += 2;
-                if (marker === 0xFFE1) { // APP1 block (EXIF)
-                  if (view.getUint32(offset + 2) === 0x45786966) { // "Exif"
-                    const little = view.getUint16(offset + 8) === 0x4949;
-                    const ifdOffset = offset + 8 + view.getUint32(offset + 12, little);
-                    const entries = view.getUint16(ifdOffset, little);
-                    for (let i = 0; i < entries; i++) {
-                      if (view.getUint16(ifdOffset + 2 + i * 12, little) === 0x0112) {
-                        orientation = view.getUint16(ifdOffset + 2 + i * 12 + 8, little);
-                        break;
-                      }
-                    }
-                  }
-                  break;
-                }
-                offset += view.getUint16(offset);
-              }
-            }
-          } catch (_) { /* EXIF parse failed, keep orientation=1 */ }
-        }
-
-        const img = new Image();
-        img.onerror = rej;
-        img.onload = () => {
-          const canvas = document.createElement("canvas");
-          const swap = orientation >= 5 && orientation <= 8;
-          canvas.width  = swap ? img.height : img.width;
-          canvas.height = swap ? img.width  : img.height;
-          const ctx = canvas.getContext("2d");
-          // Apply rotation transform based on EXIF orientation value
-          switch (orientation) {
-            case 2: ctx.transform(-1,0,0,1,canvas.width,0); break;
-            case 3: ctx.transform(-1,0,0,-1,canvas.width,canvas.height); break;
-            case 4: ctx.transform(1,0,0,-1,0,canvas.height); break;
-            case 5: ctx.transform(0,1,1,0,0,0); break;
-            case 6: ctx.transform(0,1,-1,0,canvas.height,0); break;
-            case 7: ctx.transform(0,-1,-1,0,canvas.height,canvas.width); break;
-            case 8: ctx.transform(0,-1,1,0,0,canvas.width); break;
-          }
-          ctx.drawImage(img, 0, 0);
-          URL.revokeObjectURL(img.src);
-          // Return base64 without the data: prefix
-          res(canvas.toDataURL("image/jpeg", 0.92).split(",")[1]);
-        };
-        img.src = URL.createObjectURL(file);
+    // Modern browsers (Chrome 81+, Firefox 26+, Safari 14+) auto-apply EXIF orientation
+    // when loading an img element, so drawing it to canvas captures the already-corrected
+    // image. Manual EXIF parsing would double-rotate the image — don't do it.
+    const normaliseImage = (file) => new Promise((res, rej) => {
+      const img = new Image();
+      img.onerror = rej;
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width  = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        canvas.getContext("2d").drawImage(img, 0, 0);
+        URL.revokeObjectURL(img.src);
+        res(canvas.toDataURL("image/jpeg", 0.92).split(",")[1]);
       };
-      reader.readAsArrayBuffer(file);
+      img.src = URL.createObjectURL(file);
     });
 
-    const image_base64 = await correctOrientation(afPhotoFile);
+    const image_base64 = await normaliseImage(afPhotoFile);
     const media_type = "image/jpeg";
 
     const { data:{ session } } = await sbClient.auth.getSession();
