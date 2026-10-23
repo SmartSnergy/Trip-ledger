@@ -29,11 +29,15 @@ Rules for dietary_tags:
 - Most fresh fruit, vegetables, legumes, plain rice, and plain nuts are "vegan" + "vegetarian"
 
 Rules:
-- "price" is ALWAYS the unit price per single item (the app multiplies qty × price itself)
-- qty defaults to 1
-- For multi-unit lines like "0.99 x 2  1.98": qty=2, price=0.99 (unit price)
-- For weight lines like "0.962 kg x 1.69 EUR/kg  1.63": qty=1, price=1.63 (total charged — only one "unit")
-- For discount lines like "RABATT 20%  -0.36": qty=1, price=-0.36 (keep as single negative item)
+QUANTITY AND PRICE RULES (read carefully — this is where mistakes happen):
+- "price" is ALWAYS the unit price for ONE item. The app multiplies qty × price to get the line total.
+- qty defaults to 1. Only set qty > 1 when the receipt EXPLICITLY shows a multiplier like "2 x 1.95" or "3 St × 0.85" on that same line.
+- If the only number on a line is a single price (e.g. "Produkt  3,90"), set qty=1 and price=3.90 — do NOT infer any quantity.
+- Numbers in the PRODUCT NAME (e.g. "2er Pack", "6-pack", "500ml", "12x") are product descriptions, NOT quantity multipliers. Set qty=1.
+- For lines like "2 x 1,95  3,90" or "2 St 1,95 EUR  3,90": qty=2, price=1.95 (the unit price, NOT 3.90)
+- For weight lines like "0.962 kg x 1.69 EUR/kg  1.63": qty=1, price=1.63 (only one charge)
+- For discount lines like "RABATT 20%  -0.36": qty=1, price=-0.36 (negative item)
+- NEVER use the line total as the price when qty > 1. If "2 x 1.95" gives a line total of "3.90", price=1.95 not 3.90.
 - Skip tax summary rows, subtotals, payment lines, barcodes, store address lines
 - Translate German item names to clear English (e.g. "Ganzes Hähnchen" → "Whole chicken")
 - Clean up abbreviations (e.g. "K.champignons" → "Champignon mushrooms", "Bio-Eier OKT 10er" → "Organic eggs x10")
