@@ -52,42 +52,98 @@ Categories (assign exactly one — be precise):
 - "House Supplies" — cleaning products, hygiene, toiletries, household non-food (dishwasher tabs, cat litter, socks, bags, etc.)
 - "Consumables" — pantry staples: canned goods, pasta, rice, oil, spices, condiments, pulses (beans, chickpeas, lentils), tomatoes (canned/passata), sugar, flour`;
 
+function extractJson(text: string) {
+  const m = text.match(/```(?:json)?\s*([\s\S]*?)```/) || text.match(/(\{[\s\S]*\})/);
+  return JSON.parse((m ? m[1] : text).trim());
+}
+
+function itemsSum(items: Array<{ qty: number; price: number }>): number {
+  return Math.round(items.reduce((s, it) => s + (it.qty || 1) * it.price, 0) * 100) / 100;
+}
+
+const imageContent = (base64: string, mediaType: string) => ({
+  type: "image" as const,
+  source: { type: "base64" as const, media_type: mediaType as "image/jpeg", data: base64 },
+});
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    // Verify caller is authenticated
     const auth = req.headers.get("Authorization");
     if (!auth) return new Response("Unauthorized", { status: 401, headers: corsHeaders });
 
     const { image_base64, media_type } = await req.json();
     if (!image_base64) return new Response(JSON.stringify({ error: "No image provided" }), { status: 400, headers: corsHeaders });
 
-    const response = await client.messages.create({
+    const mt = media_type || "image/jpeg";
+
+    // ── First pass: full parse ────────────────────────────────────────────────
+    const firstResp = await client.messages.create({
       model: "claude-haiku-4-5",
       max_tokens: 2048,
       system: SYSTEM_PROMPT,
       messages: [{
         role: "user",
-        content: [{
-          type: "image",
-          source: {
-            type: "base64",
-            media_type: media_type || "image/jpeg",
-            data: image_base64,
-          },
-        }, {
-          type: "text",
-          text: "Parse this receipt and return the JSON.",
-        }],
+        content: [
+          imageContent(image_base64, mt),
+          { type: "text", text: "Parse this receipt and return the JSON." },
+        ],
       }],
     });
 
-    const text = response.content[0].type === "text" ? response.content[0].text : "";
-    // Extract JSON from response (handle markdown code blocks)
-    const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/) || text.match(/(\{[\s\S]*\})/);
-    const jsonStr = jsonMatch ? jsonMatch[1] : text;
-    const parsed = JSON.parse(jsonStr.trim());
+    const firstText = firstResp.content[0].type === "text" ? firstResp.content[0].text : "";
+    const parsed = extractJson(firstText);
+    const receiptTotal = parsed.total ? Math.round(Number(parsed.total) * 100) / 100 : 0;
+    const sum1 = itemsSum(parsed.items || []);
+    const gap = Math.round((receiptTotal - sum1) * 100) / 100;
+
+    // ── Second pass: hunt for missed items if gap > €0.10 ────────────────────
+    if (receiptTotal > 0 && Math.abs(gap) > 0.10) {
+      const alreadyFound = (parsed.items || [])
+        .map((it: { name: string; qty: number; price: number }) =>
+          `- ${it.name}: qty ${it.qty}, price €${it.price}`
+        )
+        .join("\n");
+
+      const secondResp = await client.messages.create({
+        model: "claude-haiku-4-5",
+        max_tokens: 1024,
+        system: SYSTEM_PROMPT,
+        messages: [{
+          role: "user",
+          content: [
+            imageContent(image_base64, mt),
+            {
+              type: "text",
+              text: `I already found these items (totalling €${sum1.toFixed(2)}):
+${alreadyFound}
+
+The receipt total is €${receiptTotal.toFixed(2)}, so there is a gap of €${gap.toFixed(2)} unaccounted for.
+
+Please look at the receipt again very carefully and find ONLY the items that are missing from the list above. Look for any line items I may have skipped — non-food items like socks, bags, batteries, household goods are easy to miss. Do NOT repeat items already listed.
+
+Return ONLY a JSON array of the missing items (no store/date/total wrapper):
+[{ "name": "...", "qty": 1, "price": 0.00, "category": "...", "dietary_tags": [] }]`,
+            },
+          ],
+        }],
+      });
+
+      const secondText = secondResp.content[0].type === "text" ? secondResp.content[0].text : "";
+      try {
+        // Extract either a bare array or the items field from an object
+        const arrMatch = secondText.match(/\[[\s\S]*\]/);
+        if (arrMatch) {
+          const extraItems = JSON.parse(arrMatch[0]);
+          if (Array.isArray(extraItems) && extraItems.length > 0) {
+            parsed.items = [...(parsed.items || []), ...extraItems];
+          }
+        }
+      } catch (_) {
+        // Second pass parse failed — keep first-pass result
+      }
+    }
 
     return new Response(JSON.stringify(parsed), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
