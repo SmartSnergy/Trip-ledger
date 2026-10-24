@@ -1966,7 +1966,7 @@ document.getElementById("af-save").onclick=async()=>{
   const btn=document.getElementById("af-save");btn.disabled=true;btn.textContent="Saving…";
   let photoUrl=null;
   if(afPhotoFile){ try{ photoUrl=await uploadReceiptPhoto(afPhotoFile); }catch(err){ console.error(err); } }
-  const payload={trip_id:currentTripId,store,date:dateVal,total,buyer_id:buyerId,kind:afKind,photo_url:photoUrl,payers:payersPayload.length>0?payersPayload:null};
+  const payload={trip_id:currentTripId,store,date:dateVal,total,buyer_id:buyerId,kind:afKind,photo_url:photoUrl,...(payersPayload.length>0?{payers:payersPayload}:{})};
   if(afKind==="restaurant"||afKind==="accommodation") payload.attendees=attendeesPayload;
   const{data:nr,error:e1}=await sbClient.from("receipts").insert(payload).select().single();
   if(e1){ alert("Couldn't save: "+e1.message);btn.disabled=false;btn.textContent="Save receipt";return; }
