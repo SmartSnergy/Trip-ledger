@@ -1671,7 +1671,7 @@ document.getElementById("af-scan-btn").onclick=async()=>{
     // image. Manual EXIF parsing would double-rotate the image — don't do it.
     const normaliseImage = (file) => new Promise((res, rej) => {
       const img = new Image();
-      img.onerror = rej;
+      img.onerror = () => rej(new Error("Could not load image — try a different photo."));
       img.onload = () => {
         const canvas = document.createElement("canvas");
         canvas.width  = img.naturalWidth;
@@ -1688,6 +1688,7 @@ document.getElementById("af-scan-btn").onclick=async()=>{
 
     const { data:{ session } } = await sbClient.auth.getSession();
     const token = session?.access_token;
+    if(!token) throw new Error("Not signed in — please refresh and log in again.");
 
     const supabaseUrl = sbClient.supabaseUrl || DEFAULT_SUPABASE_URL;
     const resp = await fetch(`${supabaseUrl}/functions/v1/parse-receipt`, {
@@ -1695,7 +1696,12 @@ document.getElementById("af-scan-btn").onclick=async()=>{
       headers: { "Content-Type":"application/json", "Authorization":`Bearer ${token}` },
       body: JSON.stringify({ image_base64, media_type, custom_categories: customCats.filter(c=>c.enabled!==false).map(c=>({name:c.name,description:c.description})) }),
     });
-    if(!resp.ok){ const e=await resp.text(); throw new Error(e); }
+    if(!resp.ok){
+      const raw=await resp.text();
+      let msg=raw;
+      try{ const j=JSON.parse(raw); msg=j.error||j.message||raw; }catch(_){}
+      throw new Error(msg||`Server error ${resp.status}`);
+    }
     const parsed = await resp.json();
 
     // Populate form with parsed data
@@ -1739,7 +1745,8 @@ document.getElementById("af-scan-btn").onclick=async()=>{
     }
   } catch(err){
     st.className="scan-status"; st.style.color="var(--clay)";
-    st.textContent="Scan failed: "+err.message;
+    const msg=err?.message||(typeof err==="string"?err:null)||"Unknown error — please try again.";
+    st.textContent="Scan failed: "+msg;
   }
   btn.disabled=false; btn.textContent="Re-scan";
 };
