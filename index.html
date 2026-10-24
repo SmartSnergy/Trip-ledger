@@ -1756,7 +1756,9 @@ document.getElementById("af-scan-btn").onclick=async()=>{
     }
   } catch(err){
     st.className="scan-status"; st.style.color="var(--clay)";
-    const msg=err?.message||(typeof err==="string"?err:null)||"Unknown error — please try again.";
+    let msg=err?.message||(typeof err==="string"?err:null)||"Unknown error — please try again.";
+    if(msg.toLowerCase().includes("json")||msg.toLowerCase().includes("token")||msg.toLowerCase().includes("syntax"))
+      msg="Receipt photo may be sideways or unclear — retake it upright and well-lit, then re-scan.";
     st.textContent="Scan failed: "+msg;
   }
   btn.disabled=false; btn.textContent="Re-scan";

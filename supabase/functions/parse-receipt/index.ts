@@ -9,6 +9,8 @@ const client = new Anthropic({ apiKey: Deno.env.get("ANTHROPIC_API_KEY")! });
 
 const SYSTEM_PROMPT = `You are a receipt parser. Extract all line items from grocery/supermarket receipts.
 
+CRITICAL: Your response must ALWAYS be valid JSON and nothing else. Never write explanatory text, apologies, or descriptions — not even one word outside the JSON block. If the image is rotated, sideways, upside-down, blurry, or partially visible, attempt to read it anyway and return the best JSON you can. If you truly cannot read anything, return: {"store":null,"date":null,"total":0,"items":[]}
+
 Return ONLY valid JSON in this exact shape:
 {
   "store": "store name",
