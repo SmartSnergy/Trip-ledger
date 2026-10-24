@@ -1607,14 +1607,14 @@ function renderSettlement(){
 
 // ── Add receipt form ──────────────────────────────────────────────────────────
 const OCR_POOL=[{n:"Sample vegetables",price:3.20,c:"Veggies"},{n:"Sample cheese",price:3.55,c:"Consumables"},{n:"Sample chicken",price:6.20,c:"Meat"},{n:"Sample water pack",price:2.50,c:"Consumables"},{n:"Sample beer",price:4.40,c:"Alcohol"},{n:"Sample paper towels",price:4.10,c:"House Supplies"}];
-let afPhotoFile=null,afItems=[],afKind="grocery",afReceiptTotal=0,afPayers=[];
+let afPhotoFile=null,afPhotoDataUrl=null,afItems=[],afKind="grocery",afReceiptTotal=0,afPayers=[];
 
-function afResetUpload(){ afPhotoFile=null;afReceiptTotal=0;document.getElementById("af-scan-compare").style.display="none";document.getElementById("af-photo-input").value="";document.getElementById("af-photo-preview").style.display="none";document.getElementById("af-photo-preview").src="";document.getElementById("af-upload-placeholder").style.display="";document.getElementById("af-scan-btn").style.display="none";document.getElementById("af-scan-btn").textContent="Scan receipt";const s=document.getElementById("af-scan-status");s.className="scan-status";s.textContent=""; }
+function afResetUpload(){ afPhotoFile=null;afPhotoDataUrl=null;afReceiptTotal=0;document.getElementById("af-scan-compare").style.display="none";document.getElementById("af-photo-input").value="";document.getElementById("af-photo-preview").style.display="none";document.getElementById("af-photo-preview").src="";document.getElementById("af-upload-placeholder").style.display="";document.getElementById("af-scan-btn").style.display="none";document.getElementById("af-scan-btn").textContent="Scan receipt";const s=document.getElementById("af-scan-status");s.className="scan-status";s.textContent=""; }
 
 function afHandleFile(file){
   if(!file||!file.type.startsWith("image/")) return;
   afPhotoFile=file;const r=new FileReader();
-  r.onload=e=>{ const p=document.getElementById("af-photo-preview");p.src=e.target.result;p.style.display="block";document.getElementById("af-upload-placeholder").style.display="none";document.getElementById("af-scan-btn").style.display="block";const s=document.getElementById("af-scan-status");s.className="scan-status";s.textContent="Photo attached — ready to scan."; };
+  r.onload=e=>{ afPhotoDataUrl=e.target.result;const p=document.getElementById("af-photo-preview");p.src=e.target.result;p.style.display="block";document.getElementById("af-upload-placeholder").style.display="none";document.getElementById("af-scan-btn").style.display="block";const s=document.getElementById("af-scan-status");s.className="scan-status";s.textContent="Photo attached — ready to scan."; };
   r.readAsDataURL(file);
 }
 
@@ -1672,21 +1672,29 @@ document.getElementById("af-scan-btn").onclick=async()=>{
     // Modern browsers (Chrome 81+, Firefox 26+, Safari 14+) auto-apply EXIF orientation
     // when loading an img element, so drawing it to canvas captures the already-corrected
     // image. Manual EXIF parsing would double-rotate the image — don't do it.
-    const normaliseImage = (file) => new Promise((res, rej) => {
+    // We reuse the data URL already loaded by FileReader to avoid createObjectURL failures
+    // on Android (HEIC, large camera photos). Cap at 2048px to prevent canvas OOM.
+    const normaliseImage = () => new Promise((res, rej) => {
+      if(!afPhotoDataUrl) { rej(new Error("No photo data — please re-attach the photo.")); return; }
       const img = new Image();
       img.onerror = () => rej(new Error("Could not load image — try a different photo."));
       img.onload = () => {
-        const canvas = document.createElement("canvas");
-        canvas.width  = img.naturalWidth;
-        canvas.height = img.naturalHeight;
-        canvas.getContext("2d").drawImage(img, 0, 0);
-        URL.revokeObjectURL(img.src);
-        res(canvas.toDataURL("image/jpeg", 0.92).split(",")[1]);
+        try {
+          const MAX = 2048;
+          let w = img.naturalWidth, h = img.naturalHeight;
+          if(w > MAX || h > MAX){ const s=Math.min(MAX/w,MAX/h); w=Math.round(w*s); h=Math.round(h*s); }
+          const canvas = document.createElement("canvas");
+          canvas.width = w; canvas.height = h;
+          canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+          res(canvas.toDataURL("image/jpeg", 0.92).split(",")[1]);
+        } catch(e) {
+          rej(new Error("Image too large to process — try a lower-resolution photo."));
+        }
       };
-      img.src = URL.createObjectURL(file);
+      img.src = afPhotoDataUrl;
     });
 
-    const image_base64 = await normaliseImage(afPhotoFile);
+    const image_base64 = await normaliseImage();
     const media_type = "image/jpeg";
 
     const { data:{ session } } = await sbClient.auth.getSession();
