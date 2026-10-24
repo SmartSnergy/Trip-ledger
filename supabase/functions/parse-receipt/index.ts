@@ -67,7 +67,7 @@ Dairy & Eggs:
 - SAHNE → cream (Dairy)
 - JOGHURT / YOGHURT → yoghurt (Dairy)
 Other:
-- PFAND / PFAND EUR → bottle deposit charge — SKIP entirely (not a product)
+- PFAND / PFAND EUR → bottle deposit — include as "Bottle deposit" (House Supplies)
 - PAPIERTASCHE / TRAGETASCHE / PLASTIKTASCHE → shopping bag (House Supplies)
 - GUARANA / GUARRANA → guarana (energy drink ingredient) — categorise by full product name
 - PEANUT BUTTER → peanut butter (Snacks)
@@ -107,7 +107,7 @@ DISCOUNT RULES (German receipts use many discount keywords — get these right):
 - SKIP summary/footer savings lines — these are informational and the item prices already reflect the discount:
   e.g. "Ihr Preisvorteil heute: 2,50 EUR", "Sie sparten: 1,20 EUR", "Gesamtersparnis: 3,40 EUR", "Preisvorteil gesamt"
 - NEVER use the line total as the price when qty > 1. If "2 x 1.95" gives a line total of "3.90", price=1.95 not 3.90.
-- PFAND / PFAND EUR lines are bottle deposits — do NOT include them in items at all, not even as "Unscanned items". They must be completely absent from the output JSON.
+- PFAND / PFAND EUR lines are bottle deposits — INCLUDE them as a line item so the total adds up. Use name "Bottle deposit", qty=1, price=the amount shown, category="House Supplies", dietary_tags=[].
 - Skip tax summary rows (Steuer, MwSt), subtotals (SUMME, Gesamtbetrag), payment lines (Geg. BAR, Rückgeld), barcodes, store address lines, TSE-Signatur lines
 - Translate all item names to clear English
 
