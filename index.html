@@ -710,6 +710,9 @@
 const DEFAULT_SUPABASE_URL = "https://hrxxjrpacmrrsfxfrvkr.supabase.co"; // e.g. "https://abcxyz.supabase.co"
 const DEFAULT_SUPABASE_KEY = "sb_publishable_RG3IH0yiJ5jGn8-Y9_YDiA_QetQuz9U"; // your anon / public key
 
+// Safe error message extractor — works on Error, Supabase errors, strings, DOM events, anything
+const errMsg = e => e?.message || (typeof e === "string" ? e : null) || "Unknown error — please try again.";
+
 // Create these two Payment Links in your Stripe Dashboard, then paste the URLs here.
 // In each link's settings, set: Allow promotion codes → off, Collect billing address → auto
 // The app appends ?client_reference_id=USER_ID automatically so the webhook knows who paid.
@@ -798,7 +801,7 @@ async function openManagePortal(){
     const json = await resp.json();
     if(json.url) window.location.href = json.url;
     else alert("Couldn't open billing portal: "+(json.error||"unknown error"));
-  } catch(err){ alert("Couldn't reach billing portal: "+err.message); }
+  } catch(err){ alert("Couldn't reach billing portal: "+errMsg(err)); }
 }
 
 // ── User dropdown ─────────────────────────────────────────────────────────────
@@ -893,7 +896,7 @@ document.getElementById("auth-submit").onclick = async () => {
     currentUser = result.data.user || result.data.session?.user;
     await routeAfterAuth();
   } catch(err){
-    errEl.textContent = err.message || "Authentication failed.";
+    errEl.textContent = errMsg(err) || "Authentication failed.";
   } finally { btn.disabled=false; btn.textContent = authMode==="signup"?"Create account":"Sign in"; }
 };
 
@@ -964,13 +967,13 @@ async function renderTripsList(){
         e.stopPropagation();
         if(!confirm(`Delete "${trip.name}" and all its data? This can't be undone.`)) return;
         const{error}=await sbClient.from("trips").delete().eq("id",trip.id);
-        if(error){ alert("Couldn't delete: "+error.message); return; }
+        if(error){ alert("Couldn't delete: "+errMsg(error)); return; }
         await renderTripsList();
       };
       listEl.appendChild(card);
     });
   } catch(err){
-    listEl.innerHTML = `<div style="color:var(--clay);font-size:13px;">Error: ${err.message}</div>`;
+    listEl.innerHTML = `<div style="color:var(--clay);font-size:13px;">Error: ${errMsg(err)}</div>`;
   }
 }
 
@@ -986,7 +989,7 @@ document.getElementById("nt-save").onclick = async () => {
   btn.disabled=true; btn.textContent="Creating…";
   const{data,error}=await sbClient.from("trips").insert({user_id:currentUser.id,name,start_date:start,end_date:end}).select().single();
   btn.disabled=false; btn.textContent="Create";
-  if(error){ alert("Couldn't create: "+error.message); return; }
+  if(error){ alert("Couldn't create: "+errMsg(error)); return; }
   document.getElementById("new-trip-form").style.display="none";
   document.getElementById("nt-name").value=""; document.getElementById("nt-start").value=""; document.getElementById("nt-end").value="";
   enterApp(data);
@@ -1209,7 +1212,7 @@ function openPanel(r){
     const file=e.target.files[0]; if(!file) return;
     const st=document.getElementById("photoUploadStatus"); st.className="scan-status busy";st.innerHTML=`<span class="spinner"></span> Uploading…`;
     try{ const url=await uploadReceiptPhoto(file);r.photo_url=url;await sbClient.from("receipts").update({photo_url:url}).eq("id",r.id);renderPhotoSlot(r);renderGrid(); }
-    catch(err){ st.className="scan-status";st.style.color="var(--clay)";st.textContent="Upload failed: "+err.message; }
+    catch(err){ st.className="scan-status";st.style.color="var(--clay)";st.textContent="Upload failed: "+errMsg(err); }
   };
   const di=document.getElementById("dateInput"); di.value=r.date||"";
   document.getElementById("dateRow").classList.toggle("needs-date",!r.date);
@@ -1230,7 +1233,7 @@ function openPanel(r){
   document.getElementById("deleteReceiptBtn").onclick=async()=>{
     if(!confirm(`Delete #${shortId(r.id)} — ${r.store}? Can't be undone.`)) return;
     const{error}=await sbClient.from("receipts").delete().eq("id",r.id);
-    if(error){ alert("Couldn't delete: "+error.message);return; }
+    if(error){ alert("Couldn't delete: "+errMsg(error));return; }
     receipts.splice(receipts.findIndex(x=>x.id===r.id),1);
     closePanel();renderCalendar();renderGrid();
   };
@@ -1345,7 +1348,7 @@ function renderMembers(){
       if(used){ alert(m.name+" is used on a receipt — remove or reassign those first."); return; }
       if(!confirm("Remove "+m.name+"?")) return;
       const{error}=await sbClient.from("members").delete().eq("id",m.id);
-      if(error){ alert("Couldn't remove: "+error.message);return; }
+      if(error){ alert("Couldn't remove: "+errMsg(error));return; }
       MEMBERS=MEMBERS.filter(x=>x.id!==m.id);renderMembers();
     };
     const emailInp=card.querySelector("[data-field=\"email\"]");
@@ -1368,7 +1371,7 @@ document.getElementById("trip-save").onclick=async()=>{
   if(!s||!e){ alert("Pick both a first and last day."); return; }
   if(e<s){ alert("Last day must be on or after the first day."); return; }
   const{error}=await sbClient.from("trips").update({name,start_date:s,end_date:e}).eq("id",currentTripId);
-  if(error){ alert("Couldn't save: "+error.message);return; }
+  if(error){ alert("Couldn't save: "+errMsg(error));return; }
   applyTripDates(s,e,name);renderCalendar();renderGrid();renderMembers();
 };
 
@@ -1379,7 +1382,7 @@ document.getElementById("new-member-add").onclick=async()=>{
   if(!TRIP_DATES.length){ alert("Save the trip dates first."); return; }
   if(MEMBERS.some(m=>m.name.toLowerCase()===name.toLowerCase())){ alert(name+" is already on the list."); return; }
   const{data,error}=await sbClient.from("members").insert({trip_id:currentTripId,name,email:email||null,arrive_date:TRIP_START,depart_date:TRIP_END,diet:"meat",drinks:true,no_dairy:false,no_gluten:false,meals:{breakfast:true,lunch:true,dinner:true}}).select().single();
-  if(error){ alert("Couldn't add: "+error.message);return; }
+  if(error){ alert("Couldn't add: "+errMsg(error));return; }
   if(email) syncFriend(name,email);
   MEMBERS.push(mapMemberRow(data));MEMBERS.sort((a,b)=>a.name.localeCompare(b.name));inp.value="";emailInp.value="";renderMembers();
 };
@@ -1422,7 +1425,7 @@ function renderFriendsTab(){
       if(!TRIP_DATES.length){ alert("Save the trip dates first."); return; }
       if(MEMBERS.some(m=>m.name.toLowerCase()===f.name.toLowerCase())){ alert(f.name+" is already in this trip."); return; }
       const{data,error}=await sbClient.from("members").insert({trip_id:currentTripId,name:f.name,email:f.email||null,arrive_date:TRIP_START,depart_date:TRIP_END,diet:"meat",drinks:true,no_dairy:false,no_gluten:false,meals:{breakfast:true,lunch:true,dinner:true}}).select().single();
-      if(error){ alert("Couldn't add: "+error.message);return; }
+      if(error){ alert("Couldn't add: "+errMsg(error));return; }
       MEMBERS.push(mapMemberRow(data));MEMBERS.sort((a,b)=>a.name.localeCompare(b.name));
       // Switch to members tab to show them
       document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
@@ -1462,7 +1465,7 @@ document.getElementById("friend-add-btn").onclick=async()=>{
   const e=document.getElementById("friend-email-input").value.trim();
   if(!n){ alert("Enter a name."); return; }
   const{data,error}=await sbClient.from("friends").insert({owner_id:currentUser.id,name:n,email:e||null}).select().single();
-  if(error){ alert("Couldn't save: "+error.message);return; }
+  if(error){ alert("Couldn't save: "+errMsg(error));return; }
   FRIENDS.push(data);FRIENDS.sort((a,b)=>a.name.localeCompare(b.name));
   document.getElementById("friend-name-input").value="";document.getElementById("friend-email-input").value="";
   renderFriendsTab();renderFriendsQuickAdd();
@@ -1494,7 +1497,7 @@ function renderInvitesList(){
 
 document.getElementById("share-generate-btn").onclick=async()=>{
   const{data,error}=await sbClient.from("trip_invites").insert({trip_id:currentTripId}).select().single();
-  if(error){ alert("Couldn't create invite: "+error.message);return; }
+  if(error){ alert("Couldn't create invite: "+errMsg(error));return; }
   tripInvites.push(data);
   const link=`${location.origin}${location.pathname}?invite=${data.invite_token}`;
   document.getElementById("share-link-input").value=link;
