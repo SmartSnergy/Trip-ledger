@@ -82,11 +82,23 @@ dietary_tags is an array containing zero or more of: "vegan", "vegetarian", "con
 
 QUANTITY AND PRICE RULES (read carefully — this is where mistakes happen):
 - "price" is ALWAYS the unit price for ONE item. The app multiplies qty × price to get the line total.
-- qty defaults to 1. Only set qty > 1 when the receipt EXPLICITLY shows a multiplier like "2 x 1.95" or "3 St × 0.85" on that same line.
-- If the only number on a line is a single price (e.g. "Produkt  3,90"), set qty=1 and price=3.90 — do NOT infer any quantity.
+- qty defaults to 1. Only set qty > 1 when there is an EXPLICIT multiplier for that item.
 - Numbers in the PRODUCT NAME (e.g. "2er Pack", "6-pack", "500ml", "12x") are product descriptions, NOT quantity multipliers. Set qty=1.
-- For lines like "2 x 1,95  3,90" or "2 St 1,95 EUR  3,90": qty=2, price=1.95 (the unit price, NOT 3.90)
-- For weight lines like "0.962 kg x 1.69 EUR/kg  1.63": qty=1, price=1.63 (only one charge)
+
+GERMAN TWO-LINE FORMAT (very common in REWE, Lidl, Aldi, Edeka etc.):
+Many German receipts print the item name and TOTAL price on one line, then print the quantity detail on the NEXT line:
+  PORREE           1,18 B
+    2 Stk ×  0,59          ← detail line: 2 pieces at €0.59 each
+  GURKE BIO        2,38 B
+    2 Stk ×  1,19          ← detail line: 2 cucumbers at €1.19 each
+  BIO EIER OKT     7,98 B
+    2 Stk ×  3,99          ← detail line: 2 packs at €3.99 each
+Rule: when a line contains ONLY "N Stk × UNIT_PRICE" or "N St × UNIT_PRICE" with no product name, it is a DETAIL LINE for the item immediately above it. Use qty=N and price=UNIT_PRICE for that item. Do NOT create a separate item for the detail line.
+Same applies to weight lines directly below an item:
+  INGWER BIO       1,58 B
+    0,322 kg × 4,90 EUR/kg ← detail: set qty=1, price=1.58 (the total on the item line)
+For weight items: qty=1, price = the total shown on the item's own line (NOT the per-kg rate).
+For single-line formats like "2 x 1,95  3,90" or "2 St 1,95 EUR  3,90": qty=2, price=1.95 (unit price, NOT 3.90).
 
 DISCOUNT RULES (German receipts use many discount keywords — get these right):
 - INCLUDE as a negative line item (qty=1, price=negative amount) when a discount appears BETWEEN items in the item list:
@@ -95,7 +107,8 @@ DISCOUNT RULES (German receipts use many discount keywords — get these right):
 - SKIP summary/footer savings lines — these are informational and the item prices already reflect the discount:
   e.g. "Ihr Preisvorteil heute: 2,50 EUR", "Sie sparten: 1,20 EUR", "Gesamtersparnis: 3,40 EUR", "Preisvorteil gesamt"
 - NEVER use the line total as the price when qty > 1. If "2 x 1.95" gives a line total of "3.90", price=1.95 not 3.90.
-- Skip tax summary rows, subtotals, payment lines, barcodes, store address lines, TSE-Signatur lines, Steuer rows
+- PFAND / PFAND EUR lines are bottle deposits — do NOT include them in items at all, not even as "Unscanned items". They must be completely absent from the output JSON.
+- Skip tax summary rows (Steuer, MwSt), subtotals (SUMME, Gesamtbetrag), payment lines (Geg. BAR, Rückgeld), barcodes, store address lines, TSE-Signatur lines
 - Translate all item names to clear English
 
 Categories (assign exactly one — be precise):
