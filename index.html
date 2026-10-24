@@ -259,7 +259,8 @@
   .item-build-row{ display:grid; grid-template-columns:1fr 46px 66px 108px 26px; gap:6px; align-items:center; margin-bottom:6px; }
   .item-build-row input, .item-build-row select{ font-family:'IBM Plex Sans',sans-serif; font-size:12px; padding:6px 7px; border:1px solid var(--line); border-radius:3px; }
   @media (max-width:520px){
-    .item-build-row{ grid-template-columns:46px 66px 1fr 26px; grid-template-rows:auto auto; gap:4px; }
+    .item-build-row{ grid-template-columns:46px 66px 1fr 26px; grid-template-rows:auto auto; gap:4px; border:1px solid var(--line); border-radius:5px; padding:6px; margin-bottom:8px; }
+    .item-build-row.qty-multi{ border-color:rgba(255,160,0,0.5); }
     .item-build-row input[data-f="n"]{ grid-column:1/-1; grid-row:1; font-size:12px; }
     .item-build-row input[data-f="qty"]{ grid-column:1; grid-row:2; }
     .item-build-row input[data-f="price"]{ grid-column:2; grid-row:2; }
