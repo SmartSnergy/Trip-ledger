@@ -19,16 +19,67 @@ Return ONLY valid JSON in this exact shape:
   ]
 }
 
+STEP 1 — DETECT LANGUAGE: Identify the receipt language (German, French, Italian, Spanish, English, etc.) before parsing. Apply the language-specific abbreviation rules below. Most European supermarket receipts use heavy abbreviations — resolve them using both the abbreviation table AND the price as context clues.
+
+STEP 2 — RESOLVE ABBREVIATIONS WITH PRICE CONTEXT:
+When a product name is ambiguous or abbreviated, use the price to pick the correct interpretation. Examples:
+- "CHAMP. WEISS" or "K.CHAMPIGNONS" at €1–€3 → white mushrooms (Champignons), category: Veggies — NOT champagne
+- "MAISHAEHNCHEN" or "MAISHÄHNCHEN" at €8–€12 → corn-fed whole chicken, category: Meat — NOT corn on the cob (corn costs <€2)
+- "APFEL SHAMPION" or "APFEL CHAMPION" → Champion apple (apple variety), category: Fruit — NOT champagne
+- "LAUCHZWIEBELN" → spring onions / scallions, category: Veggies — NOT garlic snails
+- If a price seems implausible for your first interpretation (e.g. €10 for a vegetable), reconsider — it is almost certainly a different product
+
+GERMAN SUPERMARKET ABBREVIATIONS (resolve before translating to English):
+Vegetables & Fruit:
+- CHAMP. / CHAMPIG. / K.CHAMPIG. → Champignons = mushrooms (Veggies)
+- MAISHAEHNCH. / MAISHÄHNCH. / MAISHAEHNCHEN → Maishähnchen = corn-fed chicken (Meat, ~€8–12)
+- HAEHNCH. / HÄHNCH. / GANZES HAEHNCHEN → Hähnchen = whole chicken (Meat)
+- LAUCHZWIEBELN → spring onions / scallions (Veggies)
+- PORREE → leek (Veggies)
+- BUSCHBOHNE / BUSCHBOHNEN → bush beans / green beans (Veggies)
+- GURKE / GURKE BIO → cucumber (Veggies)
+- ZUCCHINI GRUEN / GRÜN → green zucchini (Veggies)
+- KUERBIS / KÜRBIS → pumpkin / squash (Veggies)
+- KAROTTE / KAROTTEN BIO → carrot (Veggies)
+- BLUMENKOHL → cauliflower (Veggies)
+- FENCHEL → fennel (Veggies)
+- INGWER → ginger (Veggies)
+- FELDSALAT → lamb's lettuce (Veggies)
+- ROTE BEETE / BETE → beetroot (Veggies)
+- KOHLRABI → kohlrabi (Veggies)
+- PAPRIKA → bell pepper (Veggies)
+- SELLERIE → celery / celeriac (Veggies)
+- APFEL SHAMPION / CHAMPION / ELSTAR / BOSKOP / JONAGOLD → apple variety (Fruit)
+- APFELSINE → orange (Fruit)
+- WEINTRAUB. → grapes (Fruit)
+Meat & Protein:
+- KABANOS → Kabanos sausage / thin smoked pork sausage (Meat)
+- CHORIZO PIKANT / SCHARF → spicy chorizo (Meat)
+- HACKFLEISCH → minced meat (Meat)
+- SCHWEINEFLEISCH / SCHWEIN → pork (Meat)
+- RINDFLEISCH / RIND → beef (Meat)
+- PUTENBRUST → turkey breast (Meat)
+- LACHS → salmon (Meat)
+Dairy & Eggs:
+- BIO EIER / FREILANDEIER + month abbreviation (OKT, NOV etc.) → organic eggs, pack size from "2 Stk" etc. (Eggs)
+- QUARK → quark / curd cheese (Dairy)
+- SCHMAND → sour cream (Dairy)
+- SAHNE → cream (Dairy)
+- JOGHURT / YOGHURT → yoghurt (Dairy)
+Other:
+- PFAND / PFAND EUR → bottle deposit charge — SKIP entirely (not a product)
+- PAPIERTASCHE / TRAGETASCHE / PLASTIKTASCHE → shopping bag (House Supplies)
+- GUARANA / GUARRANA → guarana (energy drink ingredient) — categorise by full product name
+- PEANUT BUTTER → peanut butter (Snacks)
+
 dietary_tags is an array containing zero or more of: "vegan", "vegetarian", "contains_dairy", "contains_gluten", "contains_alcohol"
-Rules for dietary_tags:
 - All items are "vegan" if they contain no meat, dairy, eggs, honey, or animal products
 - All items that are vegan OR dairy+egg-free are also "vegetarian"
-- Add "contains_dairy" if the item contains milk, cheese, butter, cream, yoghurt, whey, casein (includes sauces/breads made with dairy)
-- Add "contains_gluten" if the item contains wheat, rye, barley, spelt (bread, pasta, flour, beer, most baked goods, soy sauce)
+- Add "contains_dairy" if the item contains milk, cheese, butter, cream, yoghurt, whey, casein
+- Add "contains_gluten" if the item contains wheat, rye, barley, spelt (bread, pasta, flour, beer, most baked goods)
 - Add "contains_alcohol" if the item contains alcohol
 - Most fresh fruit, vegetables, legumes, plain rice, and plain nuts are "vegan" + "vegetarian"
 
-Rules:
 QUANTITY AND PRICE RULES (read carefully — this is where mistakes happen):
 - "price" is ALWAYS the unit price for ONE item. The app multiplies qty × price to get the line total.
 - qty defaults to 1. Only set qty > 1 when the receipt EXPLICITLY shows a multiplier like "2 x 1.95" or "3 St × 0.85" on that same line.
@@ -36,30 +87,29 @@ QUANTITY AND PRICE RULES (read carefully — this is where mistakes happen):
 - Numbers in the PRODUCT NAME (e.g. "2er Pack", "6-pack", "500ml", "12x") are product descriptions, NOT quantity multipliers. Set qty=1.
 - For lines like "2 x 1,95  3,90" or "2 St 1,95 EUR  3,90": qty=2, price=1.95 (the unit price, NOT 3.90)
 - For weight lines like "0.962 kg x 1.69 EUR/kg  1.63": qty=1, price=1.63 (only one charge)
+
 DISCOUNT RULES (German receipts use many discount keywords — get these right):
 - INCLUDE as a negative line item (qty=1, price=negative amount) when a discount appears BETWEEN items in the item list:
   e.g. "RABATT  -0,36", "Preisvorteil  -0,20", "COUPON  -0,50", "Treuerabatt  -0,30", "Gutschein  -1,00", "Aktion  -0,15", "Sofortrabatt  -0,40"
   Use the euro amount shown (negative). If only a percentage is shown with no euro amount, skip it.
 - SKIP summary/footer savings lines — these are informational and the item prices already reflect the discount:
   e.g. "Ihr Preisvorteil heute: 2,50 EUR", "Sie sparten: 1,20 EUR", "Gesamtersparnis: 3,40 EUR", "Preisvorteil gesamt"
-  The difference: footer lines say "you saved X in total today" and appear after all items near the payment section. Inline discounts appear right next to specific items in the item list and have a minus sign in the price column.
 - NEVER use the line total as the price when qty > 1. If "2 x 1.95" gives a line total of "3.90", price=1.95 not 3.90.
-- Skip tax summary rows, subtotals, payment lines, barcodes, store address lines
-- Translate German item names to clear English (e.g. "Ganzes Hähnchen" → "Whole chicken")
-- Clean up abbreviations (e.g. "K.champignons" → "Champignon mushrooms", "Bio-Eier OKT 10er" → "Organic eggs x10")
+- Skip tax summary rows, subtotals, payment lines, barcodes, store address lines, TSE-Signatur lines, Steuer rows
+- Translate all item names to clear English
 
 Categories (assign exactly one — be precise):
 - "Fruit" — all fresh or dried fruit (bananas, apples, kiwi, grapes, oranges, plums, avocado, etc.)
-- "Veggies" — all fresh vegetables (cucumber, carrot, fennel, broccoli, mushrooms, peppers, zucchini, pumpkin, onion, etc.)
-- "Meat" — meat, poultry, fish, cold cuts, sausages (chicken, chorizo, kabanos, etc.)
+- "Veggies" — all fresh vegetables AND mushrooms (cucumber, carrot, fennel, broccoli, champignons, peppers, zucchini, pumpkin, onion, spring onions, leek, beans, etc.)
+- "Meat" — meat, poultry, fish, cold cuts, sausages (chicken, chorizo, kabanos, salmon, etc.)
 - "Eggs" — eggs only (Bio-Eier, Eier, eggs — never put eggs in Dairy)
-- "Dairy" — ONLY animal dairy: milk, cheese, yoghurt, cream, butter, sour cream, quark, crème fraîche, dairy desserts. NEVER plant-based items here.
+- "Dairy" — ONLY animal dairy: milk, cheese, yoghurt, cream, butter, sour cream, quark, crème fraîche. NEVER plant-based items here.
 - "Drinks" — water, juice, soft drinks, coffee, tea, oat milk, almond milk, soy milk, any plant-based drink, non-alcoholic beverages
 - "Bread" — bread, bakery, pastries
 - "Alcohol" — beer, wine, spirits, cider
 - "Snacks" — sweets, chocolate, crisps, nuts, peanut butter, spreads, protein bars
 - "Frozen" — frozen food items
-- "House Supplies" — cleaning products, hygiene, toiletries, household non-food (dishwasher tabs, cat litter, socks, bags, etc.)
+- "House Supplies" — cleaning products, hygiene, toiletries, household non-food (bags, dishwasher tabs, cat litter, socks, etc.)
 - "Consumables" — pantry staples: canned goods, pasta, rice, oil, spices, condiments, pulses (beans, chickpeas, lentils), tomatoes (canned/passata), sugar, flour`;
 
 function extractJson(text: string) {
