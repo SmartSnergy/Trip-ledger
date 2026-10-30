@@ -268,9 +268,18 @@
     .item-build-row button.rm{ grid-column:4; grid-row:2; }
   }
   .item-build-row .rm{ background:none; border:none; color:var(--clay); font-size:15px; cursor:pointer; }
-  .payer-row{ display:grid; grid-template-columns:1fr 80px 26px; gap:6px; align-items:center; margin-bottom:6px; }
-  .payer-row select, .payer-row input{ font-family:'IBM Plex Sans',sans-serif; font-size:12px; padding:6px 7px; border:1px solid var(--line); border-radius:3px; }
-  .payer-row .rm{ background:none; border:none; color:var(--clay); font-size:15px; cursor:pointer; }
+  .payer-tag{ display:inline-flex; align-items:center; gap:4px; background:var(--pine-soft); border:1px solid var(--pine); border-radius:14px; padding:3px 8px 3px 10px; font-size:12px; font-weight:500; color:var(--pine); }
+  .payer-tag .rm-tag{ background:none; border:none; cursor:pointer; color:var(--pine); font-size:14px; padding:0; line-height:1; opacity:0.7; }
+  .payer-tag .rm-tag:hover{ opacity:1; }
+  #af-payer-select{ width:100%; font-family:'IBM Plex Sans',sans-serif; font-size:12px; padding:7px 8px; border:1px dashed var(--line); border-radius:3px; background:var(--paper); color:var(--ink-soft); cursor:pointer; }
+  #af-payer-select:focus{ outline:none; border-color:var(--pine); color:var(--ink); }
+  .split-preset{ font-size:11px; padding:4px 10px; border:1px solid var(--line); border-radius:12px; background:var(--paper); cursor:pointer; font-family:inherit; color:var(--ink-soft); }
+  .split-preset:hover{ background:var(--pine-soft); border-color:var(--pine); color:var(--pine); }
+  .split-row{ display:grid; grid-template-columns:1fr auto; gap:8px; align-items:center; margin-bottom:6px; }
+  .split-row-pct{ display:flex; align-items:center; gap:4px; }
+  .split-row-pct input{ width:52px; font-size:12px; padding:5px; border:1px solid var(--line); border-radius:3px; font-family:inherit; text-align:right; background:var(--paper); color:var(--ink); }
+  .split-row-pct input:focus{ outline:none; border-color:var(--pine); }
+  .split-unallocated{ font-size:11px; color:var(--clay); margin-top:4px; }
   .item-build-row.qty-multi{ background:rgba(255,180,0,0.08); border-radius:4px; outline:1px solid rgba(255,160,0,0.35); padding:2px 4px; margin-left:-4px; }
   .add-item-btn{ font-family:'IBM Plex Mono',monospace; font-size:11.5px; background:none; border:1px dashed var(--line); color:var(--ink-soft); padding:7px 10px; border-radius:3px; cursor:pointer; width:100%; margin-top:2px; }
   .add-item-btn:hover{ border-color:var(--pine); color:var(--pine); }
@@ -653,11 +662,13 @@
     <input type="text" id="af-store" placeholder="e.g. Corner Market">
     <label class="af-label">Date</label>
     <input type="date" id="af-date">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin:10px 0 4px;">
-      <label class="af-label" style="margin:0;">Paid by</label>
-      <button type="button" id="af-add-payer-btn" style="font-size:11px;color:var(--pine);background:none;border:none;cursor:pointer;padding:0;font-family:inherit;">+ split payment</button>
+    <label class="af-label">Paid by</label>
+    <div id="af-payer-tags" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;min-height:0;align-items:center;"></div>
+    <select id="af-payer-select"><option value="">+ add person…</option></select>
+    <div id="af-split-section" style="display:none;margin-top:10px;">
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;" id="af-split-presets"></div>
+      <div id="af-split-rows"></div>
     </div>
-    <div id="af-payers-list"></div>
     <div id="groceryFields">
       <label class="af-label">Items</label>
       <div id="af-items"></div>
@@ -1785,38 +1796,109 @@ function afCurrentTotal(){
 }
 
 function renderAfPayers(){
-  const wrap=document.getElementById("af-payers-list"); if(!wrap) return;
-  wrap.innerHTML="";
+  const tagsEl=document.getElementById("af-payer-tags");
+  const selectEl=document.getElementById("af-payer-select");
+  const splitSection=document.getElementById("af-split-section");
+  const presetsEl=document.getElementById("af-split-presets");
+  const rowsEl=document.getElementById("af-split-rows");
+  if(!tagsEl||!selectEl) return;
+
   const total=afCurrentTotal();
-  const multi=afPayers.length>1;
-  afPayers.forEach((p,idx)=>{
-    const row=document.createElement("div"); row.className="payer-row";
-    const memberOpts=`<option value="">— not claimed —</option>`+MEMBERS.map(m=>`<option value="${m.id}"${p.memberId===m.id?" selected":""}>${m.name}</option>`).join("");
-    const amtCell=multi
-      ? `<input type="number" class="pr-amount" min="0" step="0.01" placeholder="€" value="${p.amount||""}">`
-      : `<span style="font-size:12px;color:var(--ink-soft);padding:0 4px;">${total>0?"€"+total.toFixed(2):""}</span>`;
-    const rmCell=multi&&afPayers.length>1
-      ? `<button type="button" class="rm pr-rm">✕</button>`
-      : `<span></span>`;
-    row.innerHTML=`<select class="pr-member">${memberOpts}</select>${amtCell}${rmCell}`;
-    row.querySelector(".pr-member").onchange=e=>{ afPayers[idx].memberId=e.target.value; };
-    if(multi){
-      row.querySelector(".pr-amount").oninput=e=>{ afPayers[idx].amount=parseFloat(e.target.value)||0; };
-      if(afPayers.length>1) row.querySelector(".pr-rm").onclick=()=>{ afPayers.splice(idx,1); renderAfPayers(); };
-    }
-    wrap.appendChild(row);
+  const activePayers=afPayers.filter(p=>p.memberId);
+  const selectedIds=new Set(activePayers.map(p=>p.memberId));
+
+  // Render tags
+  tagsEl.innerHTML="";
+  activePayers.forEach(p=>{
+    const m=MEMBERS.find(m=>m.id===p.memberId); if(!m) return;
+    const tag=document.createElement("span"); tag.className="payer-tag";
+    tag.innerHTML=`${m.name}<button type="button" class="rm-tag" aria-label="Remove ${m.name}">×</button>`;
+    tag.querySelector(".rm-tag").onclick=()=>{
+      afPayers=afPayers.filter(p2=>p2.memberId!==p.memberId);
+      renderAfPayers();
+    };
+    tagsEl.appendChild(tag);
   });
+
+  // Rebuild dropdown with only unselected members
+  selectEl.innerHTML=`<option value="">+ add person…</option>`+
+    MEMBERS.filter(m=>!selectedIds.has(m.id)).map(m=>`<option value="${m.id}">${m.name}</option>`).join("");
+  selectEl.style.display=selectedIds.size>=MEMBERS.length?"none":"";
+
+  // Single payer — auto-set amount to total
+  if(activePayers.length===1){ activePayers[0].amount=Math.round(total*100)/100; }
+
+  // Split section
+  if(activePayers.length>=2){
+    splitSection.style.display="";
+
+    // Preset buttons
+    const presets2=[["50 / 50",[50,50]],["25 / 75",[25,75]],["75 / 25",[75,25]],["33 / 67",[33.3,66.7]]];
+    const presets3=[["33 / 33 / 33",[33.3,33.3,33.4]]];
+    const presets4=[["25 / 25 / 25 / 25",[25,25,25,25]]];
+    const presets=activePayers.length===2?presets2:activePayers.length===3?presets3:activePayers.length===4?presets4:[];
+    presetsEl.innerHTML="";
+    presets.forEach(([label,pcts])=>{
+      const btn=document.createElement("button"); btn.type="button"; btn.className="split-preset"; btn.textContent=label;
+      btn.onclick=()=>{
+        pcts.forEach((pct,i)=>{ if(activePayers[i]) activePayers[i].amount=Math.round(total*pct/100*100)/100; });
+        // Fix rounding on last payer
+        const sum=activePayers.reduce((s,p)=>s+p.amount,0);
+        const last=activePayers[activePayers.length-1];
+        last.amount=Math.round((last.amount+(total-sum))*100)/100;
+        renderAfPayers();
+      };
+      presetsEl.appendChild(btn);
+    });
+
+    // Per-person % rows
+    rowsEl.innerHTML="";
+    activePayers.forEach(p=>{
+      const m=MEMBERS.find(m=>m.id===p.memberId); if(!m) return;
+      const pct=total>0?Math.round(p.amount/total*1000)/10:0;
+      const row=document.createElement("div"); row.className="split-row";
+      row.innerHTML=`<span style="font-size:13px;">${m.name}</span><div class="split-row-pct"><input type="number" min="0" max="100" step="0.1" value="${pct}"><span style="font-size:12px;color:var(--ink-soft);">%</span></div>`;
+      row.querySelector("input").oninput=e=>{
+        const newPct=parseFloat(e.target.value)||0;
+        p.amount=Math.round(total*newPct/100*100)/100;
+        // Update unallocated note without full re-render
+        const allocated=activePayers.reduce((s,ap)=>s+ap.amount,0);
+        const remaining=Math.round((total-allocated)*100)/100;
+        let note=rowsEl.querySelector(".split-unallocated");
+        if(Math.abs(remaining)>0.005){
+          if(!note){ note=document.createElement("div"); note.className="split-unallocated"; rowsEl.appendChild(note); }
+          note.textContent=`€${remaining.toFixed(2)} unallocated`;
+        } else if(note){ note.remove(); }
+      };
+      rowsEl.appendChild(row);
+    });
+
+    // Show unallocated amount
+    const allocated=activePayers.reduce((s,p)=>s+p.amount,0);
+    const remaining=Math.round((total-allocated)*100)/100;
+    if(Math.abs(remaining)>0.005){
+      const note=document.createElement("div"); note.className="split-unallocated";
+      note.textContent=`€${remaining.toFixed(2)} unallocated`;
+      rowsEl.appendChild(note);
+    }
+  } else {
+    splitSection.style.display="none";
+  }
 }
 
-document.getElementById("af-add-payer-btn").onclick=()=>{
+document.getElementById("af-payer-select").onchange=function(){
+  const mid=this.value; if(!mid) return;
   const total=afCurrentTotal();
-  if(afPayers.length===1){
-    const half=Math.round(total/2*100)/100;
-    afPayers[0].amount=half;
-    afPayers.push({memberId:"",amount:Math.round((total-half)*100)/100});
-  } else {
-    afPayers.push({memberId:"",amount:0});
+  // Remove the empty placeholder if present
+  afPayers=afPayers.filter(p=>p.memberId);
+  afPayers.push({memberId:mid,amount:0});
+  // Evenly re-split amounts
+  const n=afPayers.length;
+  if(n>0){
+    const share=Math.round(total/n*100)/100;
+    afPayers.forEach((p,i)=>p.amount=i<n-1?share:Math.round((total-(share*(n-1)))*100)/100);
   }
+  this.value="";
   renderAfPayers();
 };
 
@@ -1861,8 +1943,10 @@ function afUpdateTotal(){
   else if(afKind==="restaurant"){ if(afRestaurantMode==="per_dish") t=afDishes.reduce((s,d)=>s+(d.price||0),0); else t=parseFloat(document.getElementById("af-restaurant-amount").value)||0; }
   else if(afKind==="accommodation") t=parseFloat(document.getElementById("af-accommodation-amount").value)||0;
   document.getElementById("af-total-amt").textContent="€"+t.toFixed(2);
-  // Keep single-payer amount display in sync
-  if(afPayers.length===1){ afPayers[0].amount=Math.round(t*100)/100; renderAfPayers(); }
+  // Keep payer amounts in sync when total changes
+  const activePays=afPayers.filter(p=>p.memberId);
+  if(activePays.length===1){ activePays[0].amount=Math.round(t*100)/100; renderAfPayers(); }
+  else if(activePays.length>1){ renderAfPayers(); }
   // Update the compare panel if a receipt total was parsed
   const cmp=document.getElementById("af-scan-compare");
   if(afReceiptTotal>0 && cmp){
@@ -1928,7 +2012,7 @@ function openAddPanel(){
   document.querySelectorAll("#splitModeToggle .kind-btn").forEach(b=>b.classList.toggle("active",b.dataset.mode==="even"));
   document.getElementById("evenSplitSection").style.display=""; document.getElementById("perDishSection").style.display="none";
   document.getElementById("af-store-label").textContent="Store / vendor"; document.getElementById("af-store").placeholder="e.g. Corner Market";
-  afPayers=[{memberId:"",amount:0}];
+  afPayers=[];
   afItems=[{n:"",qty:1,price:0,c:"Consumables"}];afRenderItems();afRenderAttendees();afRenderAccAttendees();renderAfPayers();afUpdateTotal();
   document.getElementById("overlay2").classList.add("open"); document.getElementById("panel2").classList.add("open");
 }
