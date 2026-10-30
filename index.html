@@ -198,9 +198,10 @@
   .receipt:nth-child(3n+2){ transform:rotate(0.5deg); }
   .receipt:nth-child(3n+3){ transform:rotate(-0.3deg); }
   .receipt:hover{ transform:translateY(-3px) rotate(0deg); box-shadow:var(--shadow); z-index:2; }
-  .receipt.duplicate{ background:#fff7ed; border-color:#f59e0b; }
-  .receipt.duplicate .dup-badge{ display:inline-block; }
-  .dup-badge{ display:none; font-size:10px; font-weight:600; color:#92400e; background:#fde68a; border:1px solid #f59e0b; border-radius:3px; padding:1px 6px; margin-left:6px; vertical-align:middle; }
+  .receipt.duplicate{ background:#fff7ed; border-color:#f59e0b; border-width:2px; }
+  .receipt.duplicate .dup-badge{ display:flex; }
+  .dup-badge{ display:none; position:absolute; top:8px; right:10px; align-items:center; gap:4px; font-size:10px; font-weight:700; color:#92400e; background:#fde68a; border:1px solid #f59e0b; border-radius:10px; padding:2px 8px 2px 5px; }
+  @media (prefers-color-scheme:dark){ .receipt.duplicate{ background:rgba(245,158,11,0.12); border-color:#f59e0b; } .dup-badge{ background:#78350f; color:#fde68a; border-color:#92400e; } }
   .receipt .rid{ font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--ink-soft); }
   .receipt .store{ font-weight:600; font-size:14.5px; margin:3px 0 2px; }
   .receipt .date{ font-size:11.5px; color:var(--ink-soft); margin-bottom:2px; }
@@ -1170,8 +1171,8 @@ function renderCalendar(){
 function renderGrid(){
   const grid=document.getElementById("grid"); grid.innerHTML="";
   if(!receipts.length){ grid.innerHTML='<div class="empty-state">No receipts yet. Tap "+ Add receipt" to log the first one.</div>'; return; }
-  // Detect duplicates: same store (case-insensitive) + same date + same total
-  const dupKey=r=>`${(r.store||"").trim().toLowerCase()}|${r.date||""}|${r.total.toFixed(2)}`;
+  // Detect duplicates: same date + same total (store not required — catches rescans)
+  const dupKey=r=>`${r.date||""}|${r.total.toFixed(2)}`;
   const keyCounts={};
   receipts.forEach(r=>{ const k=dupKey(r); keyCounts[k]=(keyCounts[k]||0)+1; });
   const list=calendarFilter?receipts.filter(r=>r.date===calendarFilter):receipts;
@@ -1193,7 +1194,7 @@ function renderGrid(){
       const dc=cl===0?"":(cl<r.items.length?"partial":"done");
       sHtml=`<span class="dot ${dc}"></span>${cl?cl+" item(s) claimed":"nothing claimed yet"}`;
     }
-    card.innerHTML=`<div class="rid">#${shortId(r.id)}</div><div class="store">${r.store}${r.photo_url?" 📷":""}<span class="dup-badge">Already scanned</span></div><div class="date ${r.date?"":"unassigned"}">${r.date?fmtDate(r.date):"needs a date"}</div><div class="buyer">${buyerDisplay?"Paid by "+buyerDisplay:""}</div><div class="total">€${r.total.toFixed(2)}</div><div class="breakdown">${bHtml}</div><div class="claim-status">${sHtml}</div>`;
+    card.innerHTML=`<span class="dup-badge">⚠ Duplicate</span><div class="rid">#${shortId(r.id)}</div><div class="store">${r.store}${r.photo_url?" 📷":""}</div><div class="date ${r.date?"":"unassigned"}">${r.date?fmtDate(r.date):"needs a date"}</div><div class="buyer">${buyerDisplay?"Paid by "+buyerDisplay:""}</div><div class="total">€${r.total.toFixed(2)}</div><div class="breakdown">${bHtml}</div><div class="claim-status">${sHtml}</div>`;
     card.onclick=()=>openPanel(r);
     grid.appendChild(card);
   });
