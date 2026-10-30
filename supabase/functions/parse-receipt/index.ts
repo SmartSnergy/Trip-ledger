@@ -87,20 +87,25 @@ QUANTITY AND PRICE RULES (read carefully — this is where mistakes happen):
 - qty defaults to 1. Only set qty > 1 when there is an EXPLICIT multiplier for that item.
 - Numbers in the PRODUCT NAME (e.g. "2er Pack", "6-pack", "500ml", "12x") are product descriptions, NOT quantity multipliers. Set qty=1.
 
-GERMAN TWO-LINE FORMAT (very common in REWE, Lidl, Aldi, Edeka etc.):
-Many German receipts print the item name and TOTAL price on one line, then print the quantity detail on the NEXT line:
-  PORREE           1,18 B
-    2 Stk ×  0,59          ← detail line: 2 pieces at €0.59 each
-  GURKE BIO        2,38 B
-    2 Stk ×  1,19          ← detail line: 2 cucumbers at €1.19 each
-  BIO EIER OKT     7,98 B
-    2 Stk ×  3,99          ← detail line: 2 packs at €3.99 each
-Rule: when a line contains ONLY "N Stk × UNIT_PRICE" or "N St × UNIT_PRICE" with no product name, it is a DETAIL LINE for the item immediately above it. Use qty=N and price=UNIT_PRICE for that item. Do NOT create a separate item for the detail line.
-Same applies to weight lines directly below an item:
-  INGWER BIO       1,58 B
-    0,322 kg × 4,90 EUR/kg ← detail: set qty=1, price=1.58 (the total on the item line)
-For weight items: qty=1, price = the total shown on the item's own line (NOT the per-kg rate).
-For single-line formats like "2 x 1,95  3,90" or "2 St 1,95 EUR  3,90": qty=2, price=1.95 (unit price, NOT 3.90).
+GERMAN TWO-LINE FORMAT — READ ROW BY ROW, NEVER SKIP AHEAD:
+Process the receipt line by line from top to bottom. Never pair a price with an item on a different line — each price belongs to the nearest item line ABOVE it.
+
+Many German receipts use a two-line format: item name + total price on one line, then a detail line immediately below it with unit info:
+  PORREE           1,18 B      ← item line: name="Porree (leek)", total=€1.18
+    2 Stk ×  0,59              ← detail line for PORREE: qty=2, unit price=€0.59 → use qty=2, price=0.59
+  GURKE BIO        2,38 B      ← item line: name="Organic cucumber", total=€2.38
+    2 Stk ×  1,19              ← detail line for GURKE BIO: qty=2, unit price=€1.19 → use qty=2, price=1.19
+  BIO EIER OKT     7,98 B      ← item line: name="Organic eggs October", total=€7.98
+    2 Stk ×  3,99              ← detail line for BIO EIER OKT: qty=2, unit price=€3.99 → use qty=2, price=3.99
+  INGWER BIO       1,58 B      ← item line
+    0,322 kg × 4,90 EUR/kg     ← weight detail for INGWER BIO: qty=1, price=1.58 (the total on the item line above)
+
+CRITICAL RULES for two-line format:
+- A line with ONLY "N Stk × PRICE" or "N.NNN kg × PRICE EUR/kg" and NO product name = detail line for the item IMMEDIATELY above. Do NOT make it a separate item. Do NOT skip it.
+- The detail line tells you qty and unit price. The item line's price is the total (qty × unit_price) — use the unit_price from the detail line, not the total.
+- For weight items: qty=1, price = the total price on the item line (the per-kg rate is informational only).
+- NEVER associate a detail line with any item other than the one directly above it.
+- For single-line formats "2 x 1,95  3,90" or "2 St 1,95 EUR  3,90": qty=2, price=1.95 (unit price, NOT 3.90).
 
 DISCOUNT RULES (German receipts use many discount keywords — get these right):
 - INCLUDE as a negative line item (qty=1, price=negative amount) when a discount appears BETWEEN items in the item list:
@@ -112,6 +117,12 @@ DISCOUNT RULES (German receipts use many discount keywords — get these right):
 - PFAND / PFAND EUR lines are bottle deposits — INCLUDE them as a line item so the total adds up. Use name "Bottle deposit", qty=1, price=the amount shown, category="House Supplies", dietary_tags=[].
 - Skip tax summary rows (Steuer, MwSt), subtotals (SUMME, Gesamtbetrag), payment lines (Geg. BAR, Rückgeld), barcodes, store address lines, TSE-Signatur lines
 - Translate all item names to clear English
+
+STORE NAME — cross-reference the header text against known chains and use the canonical name:
+German: REWE → "REWE", LIDL → "Lidl", ALDI → "Aldi", EDEKA → "Edeka", PENNY → "Penny", NETTO → "Netto", KAUFLAND → "Kaufland", TEGUT → "Tegut", ALNATURA → "Alnatura", DENN'S → "denn's Biomarkt", ROSSMANN → "Rossmann", DM-DROGERIE → "dm", OBI → "OBI", SATURN → "Saturn", MEDIA MARKT → "MediaMarkt"
+Austria: BILLA → "Billa", SPAR → "Spar", HOFER → "Hofer", MERKUR → "Merkur"
+Other EU: CARREFOUR → "Carrefour", LECLERC → "E.Leclerc", MERCADONA → "Mercadona", ALBERT HEIJN → "Albert Heijn", JUMBO → "Jumbo", COOP → "Coop", MIGROS → "Migros", ESSELUNGA → "Esselunga", SAINSBURY → "Sainsbury's", TESCO → "Tesco", WAITROSE → "Waitrose", MARKS SPENCER / M&S → "Marks & Spencer"
+If the store name on the receipt doesn't match any known chain, use the name as printed (cleaned up, title-case).
 
 Categories (assign exactly one — be precise):
 - "Fruit" — all fresh or dried fruit (bananas, apples, kiwi, grapes, oranges, plums, avocado, etc.)
@@ -211,14 +222,15 @@ ${alreadyFound}
 
 The receipt total is €${receiptTotal.toFixed(2)}, so there is a gap of €${gap.toFixed(2)} unaccounted for.
 
-Please look at the receipt again very carefully and find ONLY the items that are missing from the list above. Look especially for:
-- Inline discount lines (e.g. "Preisvorteil -0,20", "RABATT -0,36", "COUPON -0,50", "Sofortrabatt -0,40") that appear in the item list with a minus sign — these must be included as negative-price items
-- Non-food items like socks, bags, batteries, household goods that are easy to miss
-- Any other priced line between the first and last item that was skipped
-Do NOT include footer/summary savings lines like "Ihr Preisvorteil heute" or "Sie sparten" — only inline discounts with a minus sign in the price column.
-Do NOT repeat items already listed.
+Scan the receipt again line by line and find ONLY items genuinely missing from the list above. The items above were already found — do NOT include them again even if you spot them on the receipt. Look especially for:
+- Inline discount lines with a minus sign in the price column (e.g. "Preisvorteil -0,20", "RABATT -0,36") — include as negative-price items
+- Non-food items (bags, batteries, household goods) that are easy to miss
+- PFAND / bottle deposit lines — include as "Bottle deposit"
+Do NOT include: footer savings summaries ("Ihr Preisvorteil heute", "Sie sparten"), tax rows, payment lines, subtotals.
+Do NOT repeat any item already in the list above — if you are unsure whether an item is new, leave it out.
 
-Return ONLY a JSON array of the missing items (no store/date/total wrapper):
+If there are no genuinely new items, return an empty array: []
+Otherwise return ONLY a JSON array (no wrapper object):
 [{ "name": "...", "qty": 1, "price": 0.00, "category": "...", "dietary_tags": [] }]`,
             },
           ],
@@ -238,6 +250,17 @@ Return ONLY a JSON array of the missing items (no store/date/total wrapper):
       } catch (_) {
         // Second pass parse failed — keep first-pass result
       }
+    }
+
+    // Deduplicate items by name+price before returning (guards against second-pass re-finding items)
+    if (Array.isArray(parsed.items)) {
+      const seen = new Set<string>();
+      parsed.items = parsed.items.filter((it: { name: string; price: number }) => {
+        const key = `${(it.name || "").trim().toLowerCase()}|${it.price}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
     }
 
     return new Response(JSON.stringify(parsed), {

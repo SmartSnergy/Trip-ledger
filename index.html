@@ -1682,6 +1682,11 @@ document.getElementById("af-scan-btn").onclick=async()=>{
         try {
           const MAX = 2048;
           let w = img.naturalWidth, h = img.naturalHeight;
+          // Receipts are always taller than wide — reject landscape photos
+          if(w > h){
+            rej(new Error("Receipt is sideways — rotate your phone upright (portrait) and retake the photo."));
+            return;
+          }
           if(w > MAX || h > MAX){ const s=Math.min(MAX/w,MAX/h); w=Math.round(w*s); h=Math.round(h*s); }
           const canvas = document.createElement("canvas");
           canvas.width = w; canvas.height = h;
@@ -1720,13 +1725,21 @@ document.getElementById("af-scan-btn").onclick=async()=>{
     if(parsed.date) document.getElementById("af-date").value = parsed.date;
 
     const validCats = new Set(allCats());
+    const seenKeys = new Set();
     afItems = (parsed.items||[]).map(it=>({
       n: it.name||"",
       qty: Number(it.qty)||1,
       price: Number(it.price)||0,
       c: validCats.has(it.category) ? it.category : "Consumables",
       dietary_tags: it.dietary_tags||[],
-    })).filter(it=>it.n && it.price!==0);
+    })).filter(it=>{
+      if(!it.n || it.price===0) return false;
+      // Deduplicate: skip if we already have an item with the same name+price
+      const key=`${it.n.trim().toLowerCase()}|${it.price}`;
+      if(seenKeys.has(key)) return false;
+      seenKeys.add(key);
+      return true;
+    });
 
     // If the receipt total doesn't match the items sum, add an adjustment line
     afReceiptTotal = parsed.total ? Math.round(Number(parsed.total)*100)/100 : 0;
