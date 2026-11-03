@@ -1797,11 +1797,46 @@ document.getElementById("af-scan-btn").onclick=async()=>{
   // Merge items across all photos with fuzzy dedup.
   // Cross-photo only: same price + ≥70% shared meaningful words → same item.
   // Items from the SAME photo are never merged (they are distinct receipt entries).
-  const STOP = new Set(["bio","organic","fresh","natural","premium","herbal","and","the","with","for","von","aus"]);
-  const SYNS = {"fairtrade":"fair","cornichon":"gherkin","zucchini":"courgette","courgette":"zucchini","aubergine":"eggplant","eggplant":"aubergine","trauben":"grape","weintraub":"grape","moehren":"carrot","karotten":"carrot","karotte":"carrot","moehre":"carrot","mohren":"carrot","mohre":"carrot","gurken":"cucumber","gurke":"cucumber","champignon":"mushroom","paprika":"pepper","lauchzwiebel":"scallion","porree":"leek","blumenkohl":"cauliflower","haferflocken":"oat","sultaninen":"sultana","rosinen":"raisin","heidelbeere":"blueberry","erdbeere":"strawberry","himbeere":"raspberry","banane":"banana","apfel":"apple","birne":"pear","kirsche":"cherry","fenchel":"fennel","ingwer":"ginger","sellerie":"celery","kohl":"cabbage","zwiebel":"onion","knoblauch":"garlic"};
+  const STOP = new Set(["bio","organic","fresh","natural","premium","and","the","with","for","von","aus","der","die","das","ein","eine","mit","im"]);
+  const SYNS = {
+    // normalise compound fairtr word
+    "fairtrade":"fair",
+    // German herbs & veg
+    "basilikum":"basil","topf":"pot",
+    "tomate":"tomato","tomaten":"tomato",
+    "erbse":"pea","erbsen":"pea","bohne":"bean","bohnen":"bean",
+    "spinat":"spinach","salat":"salad","rucola":"rocket",
+    "petersilie":"parsley","schnittlauch":"chive","lauch":"leek","mais":"corn",
+    // German meat & dairy
+    "gefluegel":"poultry","geflugel":"poultry",
+    "huhn":"chicken","huehnchen":"chicken","haehnchen":"chicken","hahnchen":"chicken",
+    "rind":"beef","rindfleisch":"beef","schwein":"pork","schweinefleisch":"pork","lamm":"lamb",
+    "wurst":"sausage","wurstchen":"sausage","wuerstchen":"sausage",
+    "schinken":"ham","speck":"bacon",
+    "kase":"cheese","kaese":"cheese",
+    "joghurt":"yogurt","yoghurt":"yogurt",
+    "sahne":"cream","rahm":"cream","milch":"milk",
+    // German staples & fruit
+    "brot":"bread","broetchen":"roll","brotchen":"roll",
+    "mehl":"flour","zucker":"sugar","nudeln":"pasta","reis":"rice","oel":"oil","essig":"vinegar","salz":"salt",
+    "pflaume":"plum","pflaumen":"plum","pfirsich":"peach","melone":"melon","ananas":"pineapple",
+    "zitrone":"lemon","zitronen":"lemon","limette":"lime","limetten":"lime","honig":"honey","eier":"egg",
+    // existing German-English
+    "cornichon":"gherkin",
+    "zucchini":"courgette","courgette":"zucchini","aubergine":"eggplant","eggplant":"aubergine",
+    "trauben":"grape","weintraub":"grape",
+    "moehren":"carrot","karotten":"carrot","karotte":"carrot","moehre":"carrot","mohren":"carrot","mohre":"carrot",
+    "gurken":"cucumber","gurke":"cucumber","champignon":"mushroom","paprika":"pepper",
+    "lauchzwiebel":"scallion","porree":"leek","blumenkohl":"cauliflower","haferflocken":"oat",
+    "sultaninen":"sultana","rosinen":"raisin",
+    "heidelbeere":"blueberry","erdbeere":"strawberry","himbeere":"raspberry",
+    "banane":"banana","apfel":"apple","birne":"pear","kirsche":"cherry",
+    "fenchel":"fennel","ingwer":"ginger","sellerie":"celery","kohl":"cabbage","zwiebel":"onion","knoblauch":"garlic"
+  };
   const stem = w => w.endsWith("s") && w.length > 3 ? w.slice(0,-1) : w;
   const mkWords = n => {
     const words = (n||"").toLowerCase()
+      .replace(/ä/g,"ae").replace(/ö/g,"oe").replace(/ü/g,"ue").replace(/ß/g,"ss")
       .replace(/\d+[\.,]?\d*\s*(g|kg|ml|l|cl|oz|lb)\b/gi,"")
       .replace(/[^a-z\s]/g,"").split(/\s+/)
       .map(w=>w.trim()).filter(w=>w.length>2 && !STOP.has(w)).map(stem).map(w=>SYNS[w]||w);
