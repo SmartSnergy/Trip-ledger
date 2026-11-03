@@ -118,6 +118,13 @@ Packaging / preparation descriptors (standardize these too):
 - im Topf / en pot → "in pot" (e.g. "Basil in pot")
 - Bio / Bioland / Biol. → "organic" (use once at the start, do not repeat)
 
+WORD ORDER RULE — always preserve the German noun+descriptor order into English. Never invert it:
+- "Tomaten Mix" → "tomato mix" (NEVER "mixed tomatoes")
+- "Trauben dunkel" → "dark grapes" (adjective before noun is natural English here — use that consistently)
+- "Rote Bete gekocht" → "cooked beetroot"
+- "Möhren 1kg" → "carrots 1kg" (keep size after noun)
+- When in doubt: noun first, then descriptors. Two scans of the same receipt MUST produce the same word order.
+
 KNOWN BRANDS — cross-reference brand name to override category guesses:
 - KIRPA / BIO KIRPA → Kirpa is a HERBAL TEA brand. EVERY Kirpa product is tea → "Drinks". CRITICAL: "Kirpa Gold Kurkuma" = golden turmeric tea (NOT curry powder, NOT snack). "Kirpa Halsliebe" = throat-soothing herbal tea. Never put Kirpa in Snacks or Consumables.
 - VOELKEL / VÖLKEL → organic juice / beverage brand → "Drinks"
