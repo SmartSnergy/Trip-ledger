@@ -1799,8 +1799,10 @@ document.getElementById("af-scan-btn").onclick=async()=>{
   // Items from the SAME photo are never merged (they are distinct receipt entries).
   const STOP = new Set(["bio","organic","fresh","natural","premium","and","the","with","for","von","aus","der","die","das","ein","eine","mit","im"]);
   const SYNS = {
-    // normalise compound fairtr word
+    // normalise compound fairtrade word
     "fairtrade":"fair",
+    // grated/shredded are the same preparation
+    "gerieben":"shredded","grated":"shredded",
     // German herbs & veg
     "basilikum":"basil","topf":"pot",
     "tomate":"tomato","tomaten":"tomato",
