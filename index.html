@@ -1794,17 +1794,27 @@ document.getElementById("af-scan-btn").onclick=async()=>{
   if(mergedStore) document.getElementById("af-store").value=mergedStore;
   if(mergedDate) document.getElementById("af-date").value=mergedDate;
 
-  // Merge items across all photos, dedup by name+price (preserves receipt order)
+  // Merge items across all photos, dedup by name+price.
+  // Also catches near-dupes: same price + names that differ only in
+  // weight descriptors, punctuation, or capitalisation (e.g. "Tomato mix 500g" vs "Tomato Mix").
+  const normName = n => (n||"").toLowerCase()
+    .replace(/\d+[\.,]?\d*\s*(g|kg|ml|l|cl|oz|lb)\b/gi,"")
+    .replace(/\d+er\s*(pack|stück|st\.?)/gi,"")
+    .replace(/[^a-z0-9\s]/g,"").replace(/\s+/g," ").trim();
   const validCats = new Set(allCats());
-  const seenKeys = new Set();
+  const seenExact = new Set();
+  const seenNorm = new Set();
   afItems=[];
   for(const p of allParsed){
     (p.items||[]).forEach(it=>{
       const item={ n:it.name||"", qty:Number(it.qty)||1, price:Number(it.price)||0, c:validCats.has(it.category)?it.category:"Consumables", dietary_tags:it.dietary_tags||[] };
       if(!item.n || item.price===0) return;
-      const key=`${item.n.trim().toLowerCase()}|${item.price}`;
-      if(seenKeys.has(key)) return;
-      seenKeys.add(key);
+      const exactKey=`${item.n.trim().toLowerCase()}|${item.price}`;
+      if(seenExact.has(exactKey)) return;
+      const normKey=`${normName(item.n)}|${item.price}`;
+      if(seenNorm.has(normKey)) return;
+      seenExact.add(exactKey);
+      seenNorm.add(normKey);
       afItems.push(item);
     });
   }
