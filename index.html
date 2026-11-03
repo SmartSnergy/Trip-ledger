@@ -291,6 +291,15 @@
   .upload-zone{ border:1.5px dashed var(--line); border-radius:5px; padding:14px 12px; text-align:center; cursor:pointer; background:var(--paper); transition:border-color .15s ease, background .15s ease; display:block; width:100%; box-sizing:border-box; }
   .upload-zone.drag{ border-color:var(--pine); background:var(--pine-soft); }
   .visually-hidden{ position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+  .photo-pick-btn{ display:inline-flex; align-items:center; gap:5px; padding:10px 16px; border:1.5px solid var(--line); border-radius:5px; cursor:pointer; font-size:13px; font-family:'IBM Plex Sans',sans-serif; background:var(--paper); color:var(--ink-soft); transition:border-color .15s,color .15s; }
+  .photo-pick-sm{ padding:7px 12px; font-size:12px; }
+  .photo-pick-btn:hover{ border-color:var(--pine); color:var(--pine); }
+  #af-photo-empty{ border:1.5px dashed var(--line); border-radius:5px; padding:14px 12px; text-align:center; background:var(--paper); }
+  #af-photo-empty.drag{ border-color:var(--pine); background:var(--pine-soft); }
+  .photo-thumb-wrap{ position:relative; width:72px; height:90px; border-radius:5px; overflow:hidden; flex:none; border:1px solid var(--line); }
+  .photo-thumb-wrap img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .photo-thumb-rm{ position:absolute; top:2px; right:2px; background:rgba(0,0,0,0.55); border:none; color:#fff; border-radius:50%; width:18px; height:18px; font-size:13px; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0; line-height:1; }
+  .photo-thumb-num{ position:absolute; bottom:3px; left:4px; font-size:9px; font-weight:700; color:#fff; background:rgba(0,0,0,0.5); border-radius:3px; padding:1px 3px; }
   .upload-icon{ font-size:22px; margin-bottom:4px; }
   .upload-text{ font-size:12px; color:var(--ink-soft); }
   .upload-zone img{ max-width:100%; max-height:220px; display:block; margin:0 auto; border-radius:3px; }
@@ -640,11 +649,21 @@
       <button type="button" class="kind-btn" data-kind="accommodation">Accommodation</button>
     </div>
     <label class="af-label">Receipt photo</label>
-    <label class="upload-zone" id="af-upload-zone" for="af-photo-input">
-      <input type="file" id="af-photo-input" accept="image/*" class="visually-hidden">
-      <div id="af-upload-placeholder"><div class="upload-icon">📷</div><div class="upload-text">Tap to add a photo, or drop one here</div></div>
-      <img id="af-photo-preview" style="display:none;">
-    </label>
+    <input type="file" id="af-photo-camera" accept="image/*" capture="environment" class="visually-hidden">
+    <input type="file" id="af-photo-library" accept="image/*" class="visually-hidden">
+    <div id="af-photo-empty">
+      <div style="display:flex;gap:8px;justify-content:center;">
+        <label for="af-photo-camera" class="photo-pick-btn">📷 Camera</label>
+        <label for="af-photo-library" class="photo-pick-btn">🖼 Library</label>
+      </div>
+    </div>
+    <div id="af-photo-gallery" style="display:none;">
+      <div id="af-photo-thumbs" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;"></div>
+      <div id="af-photo-add-row" style="display:flex;gap:6px;">
+        <label for="af-photo-camera" class="photo-pick-btn photo-pick-sm">📷 Camera</label>
+        <label for="af-photo-library" class="photo-pick-btn photo-pick-sm">🖼 Library</label>
+      </div>
+    </div>
     <button class="add-btn scan-btn" id="af-scan-btn" style="display:none;">Scan receipt</button>
     <div class="scan-status" id="af-scan-status"></div>
     <div id="af-scan-compare" style="display:none;font-size:12px;background:var(--slate-soft);border:1px solid var(--slate);border-radius:6px;padding:8px 12px;margin:6px 0 2px;display:none;">
@@ -1621,22 +1640,45 @@ function renderSettlement(){
 
 // ── Add receipt form ──────────────────────────────────────────────────────────
 const OCR_POOL=[{n:"Sample vegetables",price:3.20,c:"Veggies"},{n:"Sample cheese",price:3.55,c:"Consumables"},{n:"Sample chicken",price:6.20,c:"Meat"},{n:"Sample water pack",price:2.50,c:"Consumables"},{n:"Sample beer",price:4.40,c:"Alcohol"},{n:"Sample paper towels",price:4.10,c:"House Supplies"}];
-let afPhotoFile=null,afPhotoDataUrl=null,afItems=[],afKind="grocery",afReceiptTotal=0,afPayers=[];
+const AF_MAX_PHOTOS=4;
+let afPhotoFiles=[],afPhotoDataUrls=[],afItems=[],afKind="grocery",afReceiptTotal=0,afPayers=[];
 
-function afResetUpload(){ afPhotoFile=null;afPhotoDataUrl=null;afReceiptTotal=0;document.getElementById("af-scan-compare").style.display="none";document.getElementById("af-photo-input").value="";document.getElementById("af-photo-preview").style.display="none";document.getElementById("af-photo-preview").src="";document.getElementById("af-upload-placeholder").style.display="";document.getElementById("af-scan-btn").style.display="none";document.getElementById("af-scan-btn").textContent="Scan receipt";const s=document.getElementById("af-scan-status");s.className="scan-status";s.textContent=""; }
+function afRenderPhotoGallery(){
+  const empty=document.getElementById("af-photo-empty");
+  const gallery=document.getElementById("af-photo-gallery");
+  const thumbsEl=document.getElementById("af-photo-thumbs");
+  const addRow=document.getElementById("af-photo-add-row");
+  if(afPhotoDataUrls.length===0){ empty.style.display=""; gallery.style.display="none"; return; }
+  empty.style.display="none"; gallery.style.display="";
+  thumbsEl.innerHTML="";
+  afPhotoDataUrls.forEach((url,i)=>{
+    const wrap=document.createElement("div"); wrap.className="photo-thumb-wrap";
+    const img=document.createElement("img"); img.src=url; img.alt="Photo "+(i+1);
+    const rm=document.createElement("button"); rm.type="button"; rm.className="photo-thumb-rm"; rm.innerHTML="&times;"; rm.setAttribute("aria-label","Remove photo "+(i+1));
+    rm.onclick=()=>{ afPhotoFiles.splice(i,1); afPhotoDataUrls.splice(i,1); afRenderPhotoGallery(); const s=document.getElementById("af-scan-status");s.className="scan-status";if(afPhotoDataUrls.length===0){ document.getElementById("af-scan-btn").style.display="none";s.textContent=""; }else{ s.textContent=afPhotoDataUrls.length+" photo"+(afPhotoDataUrls.length>1?"s":"")+" — ready to scan."; } };
+    const num=document.createElement("span"); num.className="photo-thumb-num"; num.textContent=i+1;
+    wrap.appendChild(img); wrap.appendChild(rm); wrap.appendChild(num); thumbsEl.appendChild(wrap);
+  });
+  const atMax=afPhotoDataUrls.length>=AF_MAX_PHOTOS;
+  addRow.style.display=atMax?"none":"";
+}
+
+function afResetUpload(){ afPhotoFiles=[];afPhotoDataUrls=[];afReceiptTotal=0;document.getElementById("af-scan-compare").style.display="none";document.getElementById("af-photo-camera").value="";document.getElementById("af-photo-library").value="";afRenderPhotoGallery();document.getElementById("af-scan-btn").style.display="none";document.getElementById("af-scan-btn").textContent="Scan receipt";const s=document.getElementById("af-scan-status");s.className="scan-status";s.textContent=""; }
 
 function afHandleFile(file){
   if(!file||!file.type.startsWith("image/")) return;
-  afPhotoFile=file;const r=new FileReader();
-  r.onload=e=>{ afPhotoDataUrl=e.target.result;const p=document.getElementById("af-photo-preview");p.src=e.target.result;p.style.display="block";document.getElementById("af-upload-placeholder").style.display="none";document.getElementById("af-scan-btn").style.display="block";const s=document.getElementById("af-scan-status");s.className="scan-status";s.textContent="Photo attached — ready to scan."; };
+  if(afPhotoFiles.length>=AF_MAX_PHOTOS){ const s=document.getElementById("af-scan-status");s.className="scan-status";s.style.color="var(--clay)";s.textContent="Maximum "+AF_MAX_PHOTOS+" photos per receipt."; return; }
+  const r=new FileReader();
+  r.onload=e=>{ afPhotoFiles.push(file); afPhotoDataUrls.push(e.target.result); afRenderPhotoGallery(); document.getElementById("af-scan-btn").style.display="block"; document.getElementById("af-scan-btn").textContent="Scan "+afPhotoDataUrls.length+" photo"+(afPhotoDataUrls.length>1?"s":""); const s=document.getElementById("af-scan-status");s.className="scan-status";s.style.color="";s.textContent=afPhotoDataUrls.length+" photo"+(afPhotoDataUrls.length>1?"s":"")+" attached — ready to scan."; };
   r.readAsDataURL(file);
 }
 
-const uploadZone=document.getElementById("af-upload-zone");
-document.getElementById("af-photo-input").addEventListener("change",e=>afHandleFile(e.target.files[0]));
-["dragenter","dragover"].forEach(ev=>uploadZone.addEventListener(ev,e=>{ e.preventDefault();uploadZone.classList.add("drag"); }));
-["dragleave","drop"].forEach(ev=>uploadZone.addEventListener(ev,e=>{ e.preventDefault();uploadZone.classList.remove("drag"); }));
-uploadZone.addEventListener("drop",e=>afHandleFile(e.dataTransfer.files[0]));
+document.getElementById("af-photo-camera").addEventListener("change",e=>{ afHandleFile(e.target.files[0]); e.target.value=""; });
+document.getElementById("af-photo-library").addEventListener("change",e=>{ afHandleFile(e.target.files[0]); e.target.value=""; });
+const emptyZone=document.getElementById("af-photo-empty");
+["dragenter","dragover"].forEach(ev=>emptyZone.addEventListener(ev,e=>{ e.preventDefault();emptyZone.classList.add("drag"); }));
+["dragleave","drop"].forEach(ev=>emptyZone.addEventListener(ev,e=>{ e.preventDefault();emptyZone.classList.remove("drag"); }));
+emptyZone.addEventListener("drop",e=>{ e.preventDefault();emptyZone.classList.remove("drag");afHandleFile(e.dataTransfer.files[0]); });
 
 // ── Custom categories UI ──────────────────────────────────────────────────────
 function renderCustomCats(){
@@ -1680,119 +1722,115 @@ document.getElementById("af-add-cat-btn").onclick=()=>{
 
 document.getElementById("af-scan-btn").onclick=async()=>{
   const st=document.getElementById("af-scan-status"),btn=document.getElementById("af-scan-btn");
-  if(!afPhotoFile){ st.textContent="No photo attached."; return; }
-  btn.disabled=true; st.className="scan-status busy"; st.innerHTML=`<span class="spinner"></span> Reading receipt with AI…`;
-  try {
-    // Modern browsers (Chrome 81+, Firefox 26+, Safari 14+) auto-apply EXIF orientation
-    // when loading an img element, so drawing it to canvas captures the already-corrected
-    // image. Manual EXIF parsing would double-rotate the image — don't do it.
-    // We reuse the data URL already loaded by FileReader to avoid createObjectURL failures
-    // Resize to ~1000×1400 target (receipt portrait shape) to keep token cost low.
-    // Formula: image tokens ≈ w*h/750. 1000×1400 ≈ 1,867 tokens vs 2048×2048 ≈ 5,590.
-    const normaliseImage = () => new Promise((res, rej) => {
-      if(!afPhotoDataUrl) { rej(new Error("No photo data — please re-attach the photo.")); return; }
-      const img = new Image();
-      img.onerror = () => rej(new Error("Could not load image — try a different photo."));
-      img.onload = () => {
-        try {
-          const MAX_W = 1000, MAX_H = 1400;
-          let w = img.naturalWidth, h = img.naturalHeight;
-          // Receipts are always taller than wide — reject landscape photos
-          if(w > h){
-            rej(new Error("Receipt is sideways — rotate your phone upright (portrait) and retake the photo."));
-            return;
-          }
-          if(w > MAX_W || h > MAX_H){ const s=Math.min(MAX_W/w,MAX_H/h); w=Math.round(w*s); h=Math.round(h*s); }
-          const canvas = document.createElement("canvas");
-          canvas.width = w; canvas.height = h;
-          canvas.getContext("2d").drawImage(img, 0, 0, w, h);
-          res(canvas.toDataURL("image/jpeg", 0.92).split(",")[1]);
-        } catch(e) {
-          rej(new Error("Image too large to process — try a lower-resolution photo."));
-        }
-      };
-      img.src = afPhotoDataUrl;
-    });
+  if(!afPhotoDataUrls.length){ st.textContent="No photo attached."; return; }
+  btn.disabled=true;
 
-    const image_base64 = await normaliseImage();
-    const media_type = "image/jpeg";
+  // Resize/normalise one photo to JPEG base64 for the API.
+  // Receipts are always portrait — reject landscape photos early.
+  const normaliseImage = (dataUrl) => new Promise((res, rej) => {
+    if(!dataUrl) { rej(new Error("No photo data — please re-attach the photo.")); return; }
+    const img = new Image();
+    img.onerror = () => rej(new Error("Could not load image — try a different photo."));
+    img.onload = () => {
+      try {
+        const MAX_W = 1000, MAX_H = 1400;
+        let w = img.naturalWidth, h = img.naturalHeight;
+        if(w > h){ rej(new Error("Receipt is sideways — rotate your phone upright (portrait) and retake the photo.")); return; }
+        if(w > MAX_W || h > MAX_H){ const s=Math.min(MAX_W/w,MAX_H/h); w=Math.round(w*s); h=Math.round(h*s); }
+        const canvas = document.createElement("canvas");
+        canvas.width = w; canvas.height = h;
+        canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+        res(canvas.toDataURL("image/jpeg", 0.92).split(",")[1]);
+      } catch(e) { rej(new Error("Image too large to process — try a lower-resolution photo.")); }
+    };
+    img.src = dataUrl;
+  });
 
-    const { data:{ session } } = await sbClient.auth.getSession();
-    const token = session?.access_token;
-    if(!token) throw new Error("Not signed in — please refresh and log in again.");
+  const total=afPhotoDataUrls.length;
+  const allParsed=[]; // collect per-photo results
+  let scanError=null;
 
-    const supabaseUrl = sbClient.supabaseUrl || DEFAULT_SUPABASE_URL;
-    const resp = await fetch(`${supabaseUrl}/functions/v1/parse-receipt`, {
-      method: "POST",
-      headers: { "Content-Type":"application/json", "Authorization":`Bearer ${token}` },
-      body: JSON.stringify({ image_base64, media_type, custom_categories: customCats.filter(c=>c.enabled!==false).map(c=>({name:c.name,description:c.description})) }),
-    });
-    if(!resp.ok){
-      const raw=await resp.text();
-      let msg=raw;
-      try{ const j=JSON.parse(raw); msg=j.error||j.message||raw; }catch(_){}
-      throw new Error(msg||`Server error ${resp.status}`);
+  const { data:{ session } } = await sbClient.auth.getSession();
+  const token = session?.access_token;
+  if(!token){ st.className="scan-status";st.style.color="var(--clay)";st.textContent="Not signed in — please refresh.";btn.disabled=false;btn.textContent="Scan receipt";return; }
+  const supabaseUrl = sbClient.supabaseUrl || DEFAULT_SUPABASE_URL;
+  const catPayload = customCats.filter(c=>c.enabled!==false).map(c=>({name:c.name,description:c.description}));
+
+  for(let i=0;i<total;i++){
+    st.className="scan-status busy"; st.style.color=""; st.innerHTML=`<span class="spinner"></span> Scanning photo ${i+1} of ${total}…`;
+    try{
+      const image_base64 = await normaliseImage(afPhotoDataUrls[i]);
+      const resp = await fetch(`${supabaseUrl}/functions/v1/parse-receipt`, {
+        method: "POST",
+        headers: { "Content-Type":"application/json", "Authorization":`Bearer ${token}` },
+        body: JSON.stringify({ image_base64, media_type:"image/jpeg", custom_categories: catPayload }),
+      });
+      if(!resp.ok){ const raw=await resp.text(); let msg=raw; try{ const j=JSON.parse(raw); msg=j.error||j.message||raw; }catch(_){} throw new Error(msg||`Server error ${resp.status}`); }
+      allParsed.push(await resp.json());
+    } catch(err){
+      let msg=err?.message||(typeof err==="string"?err:null)||"Unknown error";
+      if(msg.toLowerCase().includes("sideways")||msg.toLowerCase().includes("rotate")||msg.toLowerCase().includes("portrait"))
+        msg=`Photo ${i+1} is sideways — rotate your phone upright and retake it.`;
+      else if(msg.toLowerCase().includes("syntax")||msg.toLowerCase().includes("json")||msg.toLowerCase().includes("token")||msg.includes("500"))
+        msg=`Photo ${i+1} had too many items to read — add another photo for the rest of the receipt.`;
+      scanError=(scanError?scanError+"\n":"")+msg;
+      // Don't abort — keep scanning remaining photos
     }
-    const parsed = await resp.json();
+  }
 
-    // Populate form with parsed data
-    if(parsed.store) document.getElementById("af-store").value = parsed.store;
-    if(parsed.date) document.getElementById("af-date").value = parsed.date;
-
-    const validCats = new Set(allCats());
-    const seenKeys = new Set();
-    afItems = (parsed.items||[]).map(it=>({
-      n: it.name||"",
-      qty: Number(it.qty)||1,
-      price: Number(it.price)||0,
-      c: validCats.has(it.category) ? it.category : "Consumables",
-      dietary_tags: it.dietary_tags||[],
-    })).filter(it=>{
-      if(!it.n || it.price===0) return false;
-      // Deduplicate: skip if we already have an item with the same name+price
-      const key=`${it.n.trim().toLowerCase()}|${it.price}`;
-      if(seenKeys.has(key)) return false;
-      seenKeys.add(key);
-      return true;
-    });
-
-    // If the receipt total doesn't match the items sum, add an adjustment line
-    afReceiptTotal = parsed.total ? Math.round(Number(parsed.total)*100)/100 : 0;
-    const itemsSum = Math.round(afItems.reduce((s,it)=>s+(it.qty*it.price),0)*100)/100;
-    const diff = Math.round((afReceiptTotal - itemsSum)*100)/100;
-    if(afReceiptTotal > 0 && Math.abs(diff) > 0.005){
-      afItems.push({n: diff>0?"Unscanned items":"Receipt adjustment", qty:1, price:diff, c:"Consumables", dietary_tags:[]});
-    }
-
-    afRenderItems(); afUpdateTotal();
-    const note = afReceiptTotal>0 && Math.abs(diff)>0.005 ? ` (€${Math.abs(diff).toFixed(2)} gap auto-filled)` : "";
-    // Warn if a receipt with the same store+date+total already exists in this trip
-    const scannedStore=(parsed.store||"").trim().toLowerCase();
-    const scannedDate=parsed.date||"";
-    const scannedTotal=afReceiptTotal;
-    const alreadyExists=scannedTotal>0 && receipts.some(r=>
-      (r.store||"").trim().toLowerCase()===scannedStore &&
-      r.date===scannedDate &&
-      Math.abs(r.total-scannedTotal)<0.01
-    );
-    if(afItems.length===0 && afReceiptTotal===0){
-      st.className="scan-status"; st.style.color="var(--clay)";
-      st.textContent="Scan returned no items — receipt may be too long or unclear. Re-scan or enter items manually below.";
-    } else if(alreadyExists){
-      st.className="scan-status";st.style.color="var(--amber,#d97706)";
-      st.textContent=`⚠ This receipt looks like it was already scanned (same store, date & total). Check before saving.`;
-    } else {
-      st.className="scan-status done";
-      st.textContent=`Found ${afItems.length} items${note} — verify totals below and save.`;
-    }
-  } catch(err){
+  if(!allParsed.length){
     st.className="scan-status"; st.style.color="var(--clay)";
-    let msg=err?.message||(typeof err==="string"?err:null)||"Unknown error — please try again.";
-    if(msg.toLowerCase().includes("sideways")||msg.toLowerCase().includes("rotate")||msg.toLowerCase().includes("portrait"))
-      msg="Receipt is sideways — rotate your phone upright and retake the photo.";
-    else if(msg.toLowerCase().includes("syntax")||msg.toLowerCase().includes("json")||msg.toLowerCase().includes("token")||msg.includes("500"))
-      msg="Couldn't read this receipt — it may be too long, low contrast, or complex. Re-scan or enter items manually.";
-    st.textContent="Scan failed: "+msg;
+    st.textContent="Scan failed: "+(scanError||"Could not read any photos — try re-scanning.");
+    btn.disabled=false; btn.textContent="Re-scan"; return;
+  }
+
+  // Merge results: first store/date found, last non-zero total found
+  let mergedStore=null, mergedDate=null, mergedTotal=0;
+  for(const p of allParsed){
+    if(!mergedStore && p.store) mergedStore=p.store;
+    if(!mergedDate && p.date) mergedDate=p.date;
+    if(p.total && Number(p.total)>0) mergedTotal=Math.round(Number(p.total)*100)/100;
+  }
+  if(mergedStore) document.getElementById("af-store").value=mergedStore;
+  if(mergedDate) document.getElementById("af-date").value=mergedDate;
+
+  // Merge items across all photos, dedup by name+price (preserves receipt order)
+  const validCats = new Set(allCats());
+  const seenKeys = new Set();
+  afItems=[];
+  for(const p of allParsed){
+    (p.items||[]).forEach(it=>{
+      const item={ n:it.name||"", qty:Number(it.qty)||1, price:Number(it.price)||0, c:validCats.has(it.category)?it.category:"Consumables", dietary_tags:it.dietary_tags||[] };
+      if(!item.n || item.price===0) return;
+      const key=`${item.n.trim().toLowerCase()}|${item.price}`;
+      if(seenKeys.has(key)) return;
+      seenKeys.add(key);
+      afItems.push(item);
+    });
+  }
+
+  afReceiptTotal = mergedTotal;
+  const itemsSum = Math.round(afItems.reduce((s,it)=>s+(it.qty*it.price),0)*100)/100;
+  const diff = Math.round((afReceiptTotal - itemsSum)*100)/100;
+  if(afReceiptTotal > 0 && Math.abs(diff) > 0.005){
+    afItems.push({n: diff>0?"Unscanned items":"Receipt adjustment", qty:1, price:diff, c:"Consumables", dietary_tags:[]});
+  }
+
+  afRenderItems(); afUpdateTotal();
+  const note = afReceiptTotal>0 && Math.abs(diff)>0.005 ? ` (€${Math.abs(diff).toFixed(2)} gap auto-filled)` : "";
+  const photoNote = total>1 ? ` from ${allParsed.length} photo${allParsed.length>1?"s":""}` : "";
+  const partialNote = scanError ? ` ⚠ ${scanError}` : "";
+  const scannedStore=(mergedStore||"").trim().toLowerCase();
+  const alreadyExists=mergedTotal>0 && receipts.some(r=>(r.store||"").trim().toLowerCase()===scannedStore && r.date===mergedDate && Math.abs(r.total-mergedTotal)<0.01);
+  if(afItems.length===0 && afReceiptTotal===0){
+    st.className="scan-status"; st.style.color="var(--clay)";
+    st.textContent="Scan returned no items — try adding another photo or enter items manually.";
+  } else if(alreadyExists){
+    st.className="scan-status";st.style.color="var(--amber,#d97706)";
+    st.textContent=`⚠ This receipt looks like it was already scanned (same store, date & total). Check before saving.`;
+  } else {
+    st.className="scan-status done"; st.style.color="";
+    st.textContent=`Found ${afItems.length} items${photoNote}${note} — verify totals below and save.${partialNote}`;
   }
   btn.disabled=false; btn.textContent="Re-scan";
 };
@@ -2163,7 +2201,7 @@ document.getElementById("af-save").onclick=async()=>{
   }
   const btn=document.getElementById("af-save");btn.disabled=true;btn.textContent="Saving…";
   let photoUrl=null;
-  if(afPhotoFile){ try{ photoUrl=await uploadReceiptPhoto(afPhotoFile); }catch(err){ console.error(err); } }
+  if(afPhotoFiles.length){ try{ photoUrl=await uploadReceiptPhoto(afPhotoFiles[0]); }catch(err){ console.error(err); } }
   const payload={trip_id:currentTripId,store,date:dateVal,total,buyer_id:buyerId,kind:afKind,photo_url:photoUrl,...(payersPayload.length>0?{payers:payersPayload}:{})};
   if(afKind==="restaurant"||afKind==="accommodation") payload.attendees=attendeesPayload;
   const{data:nr,error:e1}=await sbClient.from("receipts").insert(payload).select().single();
