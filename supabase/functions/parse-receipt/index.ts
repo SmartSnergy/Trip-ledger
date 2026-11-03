@@ -106,48 +106,29 @@ QUANTITY AND PRICE RULES (read carefully — this is where mistakes happen):
 - Numbers in the PRODUCT NAME (e.g. "2er Pack", "6-pack", "500ml", "12x") are product descriptions, NOT quantity multipliers. Set qty=1.
 
 GERMAN RECEIPT FORMATS — READ ROW BY ROW, NEVER SKIP AHEAD:
-Process the receipt TOP to BOTTOM. Each price belongs to the item on ITS OWN LINE — NEVER borrow a price from an adjacent line above or below.
+Process the receipt TOP to BOTTOM. Each price belongs to the item on ITS OWN LINE ONLY. NEVER borrow a price from an adjacent line.
 
-IMPORTANT: A single receipt can mix ALL THREE formats below. Identify which format each line uses independently.
+UNIVERSAL MULTIPLIER RULE: When you see a "×" or "x" between two numbers, one is always a whole integer (the quantity) and one is always a decimal (the unit price). Regardless of order: INTEGER = qty, DECIMAL = unit price. The line total at the end is ALWAYS ignored for pricing.
+  "3,29 x 2  6,58 A"  → qty=2 (integer), price=3.29 (decimal). Line total 6.58 is ignored.
+  "1,49 x 4  5,96 A"  → qty=4 (integer), price=1.49 (decimal). Line total 5.96 is ignored.
+  "2 x 1,95  3,90"    → qty=2 (integer), price=1.95 (decimal). Line total 3.90 is ignored.
+  "1,29 x 3  3,87 A"  → qty=3 (integer), price=1.29 (decimal). Line total 3.87 is ignored.
+  "4,99 x 2  9,98 A"  → qty=2 (integer), price=4.99 (decimal). Line total 9.98 is ignored.
 
-── FORMAT A: INLINE SINGLE-LINE (Lidl, Aldi, Penny) ──
-Everything for one item is on ONE line: item_name  unit_price × qty  line_total A
-Rule: decimal number BEFORE × = unit_price; integer AFTER × = qty; last number = line_total (IGNORE line_total for price).
-  "Tomaten Mix 500g    3,29 x 2    6,58 A"   → name="Tomato Mix 500g", qty=2, price=3.29
-  "Mini Mozzarella     1,29 x 3    3,87 A"   → name="Mini Mozzarella", qty=3, price=1.29
-  "Clementinen         1,49 x 4    5,96 A"   → name="Clementines", qty=4, price=1.49
-  "Eier Freiland XXL   4,99 x 2    9,98 A"   → name="Free range eggs XL", qty=2, price=4.99
-  "Trauben dunkel      1,99 x 2    3,98 A"   → name="Dark grapes", qty=2, price=1.99
-Single-unit items on one line (NO ×): ITEM_NAME  price A → qty=1, price=price. NEVER use a price from any other line.
-  "Heicelbeeren   3,99 A"   → name="Blueberries", qty=1, price=3.99
-  "Kiwi           3,99 A"   → name="Kiwi", qty=1, price=3.99
-  "Broccoli       1,49 A"   → name="Broccoli", qty=1, price=1.49
-  "Bio Gurken     1,69 A"   → name="Organic cucumber", qty=1, price=1.69
+Items with NO multiplier on their line: qty=1, price = the single price shown. Use ONLY the price on that item's own line.
+  "Heidelbeeren  5,69 A"  → qty=1, price=5.69
+  "Kiwi          3,99 A"  → qty=1, price=3.99
+  "Broccoli      1,49 A"  → qty=1, price=1.49
 
-── FORMAT B: WEIGHT TWO-LINE (Lidl, Aldi — weighed produce at the top) ──
-Line 1: item_name alone (no price)
-Line 2: weight × per_kg_rate EUR/kg  line_total A  ← this is the DETAIL line
-  "Fenchel"                              ← item line (name only)
-  "  0,628 kg × 2,49 EUR/kg   1,56 A"   ← detail: qty=1, price=1.56 (line_total)
-  "XXX-Fairtrade Bio Bananen"            ← item line
-  "  2,876 kg × 1,99 EUR/kg   5,72 A"   ← detail: qty=1, price=5.72
-Rule: price = the line_total (right-most number); per-kg rate is informational only.
+WEIGHT ITEMS (two-line, top of Lidl/Aldi receipts): item name on one line with NO price, then weight detail on the next line.
+  "Fenchel" then "0,628 kg x 2,49 EUR/kg  1,56 A"  → name="Fennel", qty=1, price=1.56 (the line total — per-kg rate is informational only)
+  "XXX-Fairtrade Bio Bananen" then "2,876 kg x 1,99 EUR/kg  5,72 A"  → name="Organic Fairtrade Bananas", qty=1, price=5.72
 
-── FORMAT C: TWO-LINE COUNTED (REWE, Edeka, Kaufland) ──
-Line 1: item_name + line_total B
-Line 2: integer Stk × unit_price  (detail line, no price column)
-  "PORREE        1,18 B"     ← item line: name, total
-  "  2 Stk × 0,59"          ← detail: qty=2, price=0.59
-  "GURKE BIO     2,38 B"     ← item line
-  "  2 Stk × 1,19"          ← detail: qty=2, price=1.19
-  "INGWER BIO    1,58 B"     ← item line
-  "  0,322 kg × 4,90 EUR/kg" ← weight detail: qty=1, price=1.58 (from item line total)
-Rule: Detail line = ONLY "N Stk × price" or "N kg × rate EUR/kg" with NO product name. Never make it a separate item.
-
-DISAMBIGUATION — how to tell Format A from Format C:
-- Format A: the multiplier (×) is IN THE MIDDLE of the same line as the item name
-- Format C: the multiplier (×) is on a SEPARATE line with no item name, directly below the item
-- Weight two-line (B): the item name is alone on its own line, the weight + rate is on the next line
+TWO-LINE FORMAT (REWE, Edeka, Kaufland): item name + total price on line 1, then a detail line below with unit info.
+  "PORREE  1,18 B" then "2 Stk × 0,59"  → qty=2, price=0.59
+  "GURKE BIO  2,38 B" then "2 Stk × 1,19"  → qty=2, price=1.19
+  "INGWER BIO  1,58 B" then "0,322 kg × 4,90 EUR/kg"  → qty=1, price=1.58 (total from line above)
+A line with ONLY "N Stk × price" or "N kg × rate EUR/kg" and NO product name is a detail line — do NOT make it a separate item.
 
 DISCOUNT RULES (German receipts use many discount keywords — get these right):
 - INCLUDE as a negative line item (qty=1, price=negative amount) when a discount appears BETWEEN items in the item list:
