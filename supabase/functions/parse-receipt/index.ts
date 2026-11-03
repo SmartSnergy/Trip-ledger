@@ -83,6 +83,14 @@ Other:
 - PAPIERTASCHE / TRAGETASCHE / PLASTIKTASCHE → shopping bag (House Supplies)
 - GUARANA / GUARRANA → guarana (energy drink ingredient) — categorise by full product name
 - PEANUT BUTTER → peanut butter (Snacks)
+- ROHRZUCKER / RÜBENZUCKER / KOKOSBLÜTENZUCKER → cane/beet/coconut sugar → Consumables
+- HAFERFLOCKEN / HAFER → oats → Consumables
+
+KNOWN BRANDS — cross-reference brand name to override category guesses:
+- KIRPA / BIO KIRPA → Kirpa is a HERBAL TEA brand. EVERY Kirpa product is tea → "Drinks". CRITICAL: "Kirpa Gold Kurkuma" = golden turmeric tea (NOT curry powder, NOT snack). "Kirpa Halsliebe" = throat-soothing herbal tea. Never put Kirpa in Snacks or Consumables.
+- VOELKEL / VÖLKEL → organic juice / beverage brand → "Drinks"
+- BIONADE → organic soft drink → "Drinks" + "contains_alcohol":false
+- KLOSTERFRAU / DENN'S / ALNATURA → organic food brand — categorise by product type, not brand name
 
 dietary_tags is an array containing zero or more of: "vegan", "vegetarian", "contains_dairy", "contains_gluten", "contains_alcohol"
 - All items are "vegan" if they contain no meat, dairy, eggs, honey, or animal products
@@ -116,6 +124,8 @@ CRITICAL RULES for two-line format:
 - For weight items: qty=1, price = the total price on the item line (the per-kg rate is informational only).
 - NEVER associate a detail line with any item other than the one directly above it.
 - For single-line formats "2 x 1,95  3,90" or "2 St 1,95 EUR  3,90": qty=2, price=1.95 (unit price, NOT 3.90).
+- LIDL/REWE inline format — the unit_price appears BEFORE the ×, quantity AFTER: "3,29 x 2  6,58 A" → qty=2, price=3.29. "1,49 x 4  5,96 A" → qty=4, price=1.49. The final number is the LINE TOTAL — never use it as the unit price.
+- Weight items "0,628 kg × 2,49 EUR/kg  1,56 A": qty=1, price=1.56 (the line total, not the per-kg rate).
 
 DISCOUNT RULES (German receipts use many discount keywords — get these right):
 - INCLUDE as a negative line item (qty=1, price=negative amount) when a discount appears BETWEEN items in the item list:
@@ -140,7 +150,7 @@ Categories (assign exactly one — be precise):
 - "Meat" — meat, poultry, fish, cold cuts, sausages (chicken, chorizo, kabanos, salmon, etc.)
 - "Eggs" — eggs only (Bio-Eier, Eier, eggs — never put eggs in Dairy)
 - "Dairy" — ONLY animal dairy: milk, cheese, yoghurt, cream, butter, sour cream, quark, crème fraîche. NEVER plant-based items here.
-- "Drinks" — water, juice, soft drinks, coffee, tea, oat milk, almond milk, soy milk, any plant-based drink, non-alcoholic beverages
+- "Drinks" — water, juice, soft drinks, coffee, ALL tea (herbal tea, green tea, black tea, chai, turmeric tea, throat tea — any tea bag or loose tea product), oat milk, almond milk, soy milk, any plant-based drink, non-alcoholic beverages
 - "Bread" — bread, bakery, pastries
 - "Alcohol" — beer, wine, spirits, cider
 - "Snacks" — sweets, chocolate, crisps, nuts, peanut butter, spreads, protein bars
