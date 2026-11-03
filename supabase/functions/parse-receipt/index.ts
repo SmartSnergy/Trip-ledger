@@ -247,6 +247,7 @@ Deno.serve(async (req) => {
     });
 
     const firstText = firstResp.content[0].type === "text" ? firstResp.content[0].text : "";
+    console.log("parse-receipt model response (first 2000 chars):", firstText.slice(0, 2000));
     const parsed = extractJson(firstText);
     const receiptTotal = parsed.total ? Math.round(Number(parsed.total) * 100) / 100 : 0;
     const sum1 = itemsSum(parsed.items || []);
