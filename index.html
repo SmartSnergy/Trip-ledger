@@ -1794,16 +1794,21 @@ document.getElementById("af-scan-btn").onclick=async()=>{
   if(mergedStore) document.getElementById("af-store").value=mergedStore;
   if(mergedDate) document.getElementById("af-date").value=mergedDate;
 
-  // Merge items across all photos, dedup by name+price.
-  // Also catches near-dupes: same price + names that differ only in
-  // weight descriptors, punctuation, or capitalisation (e.g. "Tomato mix 500g" vs "Tomato Mix").
-  const normName = n => (n||"").toLowerCase()
-    .replace(/\d+[\.,]?\d*\s*(g|kg|ml|l|cl|oz|lb)\b/gi,"")
-    .replace(/\d+er\s*(pack|stück|st\.?)/gi,"")
-    .replace(/[^a-z0-9\s]/g,"").replace(/\s+/g," ").trim();
+  // Merge items across all photos with fuzzy dedup.
+  // Same price + ≥60% shared meaningful words → same item.
+  // e.g. "Hazelnut Milk Chocolate" and "Hazelnut chocolate" at €0.89 → one entry.
+  const STOP = new Set(["bio","organic","fresh","natural","premium","herbal","and","the","with","for","von","aus"]);
+  const stem = w => w.endsWith("s") && w.length > 3 ? w.slice(0,-1) : w;
+  const mkWords = n => {
+    const words = (n||"").toLowerCase()
+      .replace(/\d+[\.,]?\d*\s*(g|kg|ml|l|cl|oz|lb)\b/gi,"")
+      .replace(/[^a-z\s]/g,"").split(/\s+/)
+      .map(w=>w.trim()).filter(w=>w.length>2 && !STOP.has(w)).map(stem);
+    return new Set(words);
+  };
   const validCats = new Set(allCats());
   const seenExact = new Set();
-  const seenNorm = new Set();
+  const seenFuzzy = []; // [{words, price}]
   afItems=[];
   for(const p of allParsed){
     (p.items||[]).forEach(it=>{
@@ -1811,10 +1816,16 @@ document.getElementById("af-scan-btn").onclick=async()=>{
       if(!item.n || item.price===0) return;
       const exactKey=`${item.n.trim().toLowerCase()}|${item.price}`;
       if(seenExact.has(exactKey)) return;
-      const normKey=`${normName(item.n)}|${item.price}`;
-      if(seenNorm.has(normKey)) return;
+      const wa = mkWords(item.n);
+      const isDupe = seenFuzzy.some(s => {
+        if(Math.abs(s.price - item.price) > 0.001) return false;
+        if(!wa.size || !s.words.size) return false;
+        let sh=0; for(const w of wa) if(s.words.has(w)) sh++;
+        return sh / Math.min(wa.size, s.words.size) >= 0.6;
+      });
+      if(isDupe) return;
       seenExact.add(exactKey);
-      seenNorm.add(normKey);
+      seenFuzzy.push({words:wa, price:item.price});
       afItems.push(item);
     });
   }
