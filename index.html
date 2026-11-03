@@ -223,21 +223,28 @@
   .overlay{ position:fixed; inset:0; background:rgba(36,35,31,0.35); opacity:0; pointer-events:none; transition:opacity .2s ease; z-index:10; }
   .overlay.open{ opacity:1; pointer-events:auto; }
   .panel{
-    position:fixed; top:0; right:0; height:100%; width:min(440px, 92vw); background:var(--paper);
+    position:fixed; top:0; right:0; height:100dvh; width:min(440px, 92vw); background:var(--paper);
     border-left:1px solid var(--line); transform:translateX(100%); transition:transform .25s ease;
     z-index:11; display:flex; flex-direction:column; box-shadow:-12px 0 30px rgba(0,0,0,0.12);
   }
   .panel.open{ transform:translateX(0); }
-  .panel-head{ padding:20px 22px 14px; border-bottom:1px solid var(--line); background:#fff; position:relative; }
-  .panel-head .rid{ font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--ink-soft); }
-  .panel-head .store{ font-size:17px; font-weight:700; margin:2px 0 2px; }
-  .panel-head .meta{ font-size:12px; color:var(--ink-soft); margin-bottom:12px; }
+  /* Sticky top strip — store name + close button always visible */
+  .panel-sticky{
+    flex:none; padding:16px 22px 10px; border-bottom:1px solid var(--line);
+    background:#fff; position:relative;
+  }
+  .panel-sticky .rid{ font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--ink-soft); }
+  .panel-sticky .store{ font-size:17px; font-weight:700; margin:2px 0 2px; }
+  .panel-sticky .meta{ font-size:12px; color:var(--ink-soft); }
+  /* Single scroll container for everything below the header */
+  .panel-scroll{ flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+  .panel-head{ padding:14px 22px 14px; border-bottom:1px solid var(--line); background:#fff; }
   .field-row{ display:flex; gap:8px; align-items:center; margin-bottom:8px; }
   .field-row label{ font-size:11px; color:var(--ink-soft); width:64px; flex:none; }
   .field-row select, .field-row input{ font-family:'IBM Plex Sans',sans-serif; font-size:12.5px; padding:6px 8px; border:1px solid var(--line); border-radius:3px; background:#fff; color:var(--ink); flex:1; }
   .field-row.needs-date input{ border-color:var(--clay); background:var(--clay-soft); }
-  .close-btn{ position:absolute; top:16px; right:18px; background:none; border:none; font-size:20px; cursor:pointer; color:var(--ink-soft); }
-  .panel-body{ flex:1; overflow-y:auto; padding:6px 0; }
+  .close-btn{ position:absolute; top:14px; right:18px; background:none; border:none; font-size:20px; cursor:pointer; color:var(--ink-soft); }
+  .panel-body{ padding:6px 0; }
   .item-row{ display:grid; grid-template-columns:1fr auto; align-items:center; padding:11px 22px; border-bottom:1px solid var(--line); gap:8px; }
   .item-row .name{ font-size:13.5px; }
   .item-row .cat{ font-size:10.5px; color:var(--ink-soft); margin-top:2px; }
@@ -248,7 +255,7 @@
   .claim-row .claimed-tag{ font-size:11px; color:var(--pine); font-weight:600; display:none; }
   .claim-row.is-claimed .claimed-tag{ display:inline; }
   .claim-row.is-claimed select, .claim-row.is-claimed input{ border-color:var(--pine); background:var(--pine-soft); }
-  .panel-foot{ padding:16px 22px; border-top:1px solid var(--line); background:#fff; font-size:12.5px; color:var(--ink-soft); }
+  .panel-foot{ padding:16px 22px 24px; border-top:1px solid var(--line); background:#fff; font-size:12.5px; color:var(--ink-soft); }
   .panel-foot .row{ display:flex; justify-content:space-between; margin-bottom:4px; }
   .panel-foot .row.total{ font-weight:700; color:var(--ink); font-size:14px; margin-top:6px; }
 
@@ -593,43 +600,49 @@
 <!-- Receipt detail panel -->
 <div class="overlay" id="overlay"></div>
 <div class="panel" id="panel">
-  <div class="panel-head">
+  <!-- Sticky strip: always visible, shows store name -->
+  <div class="panel-sticky">
     <button class="close-btn" id="closeBtn">✕</button>
     <div class="rid" id="pRid"></div>
     <div class="store" id="pStore"></div>
     <div class="meta" id="pMeta"></div>
-    <label class="upload-zone photo-slot" id="photoSlot" for="panelPhotoInput">
-      <input type="file" id="panelPhotoInput" accept="image/*" class="visually-hidden">
-      <div id="photoPlaceholder"><div class="upload-icon">📷</div><div class="upload-text">Tap to add a photo</div></div>
-      <img id="photoPreviewImg" style="display:none;">
-    </label>
-    <div class="scan-status" id="photoUploadStatus"></div>
-    <div class="field-row" id="dateRow"><label>Date</label><input type="date" id="dateInput"></div>
-    <div class="field-row" style="align-items:flex-start;margin-bottom:4px;">
-      <label style="padding-top:4px;">Paid by</label>
-      <div style="flex:1;">
-        <div id="panel-payer-tags" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:5px;min-height:0;"></div>
-        <select id="panel-payer-select" style="width:100%;font-family:'IBM Plex Sans',sans-serif;font-size:12px;padding:6px 8px;border:1px dashed var(--line);border-radius:3px;background:var(--paper);color:var(--ink-soft);cursor:pointer;"><option value="">+ add person…</option></select>
+  </div>
+  <!-- Single scroll container: photo, fields, items, totals, delete -->
+  <div class="panel-scroll">
+    <div class="panel-head">
+      <label class="upload-zone photo-slot" id="photoSlot" for="panelPhotoInput">
+        <input type="file" id="panelPhotoInput" accept="image/*" class="visually-hidden">
+        <div id="photoPlaceholder"><div class="upload-icon">📷</div><div class="upload-text">Tap to add a photo</div></div>
+        <img id="photoPreviewImg" style="display:none;">
+      </label>
+      <div class="scan-status" id="photoUploadStatus"></div>
+      <div class="field-row" id="dateRow"><label>Date</label><input type="date" id="dateInput"></div>
+      <div class="field-row" style="align-items:flex-start;margin-bottom:4px;">
+        <label style="padding-top:4px;">Paid by</label>
+        <div style="flex:1;">
+          <div id="panel-payer-tags" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:5px;min-height:0;"></div>
+          <select id="panel-payer-select" style="width:100%;font-family:'IBM Plex Sans',sans-serif;font-size:12px;padding:6px 8px;border:1px dashed var(--line);border-radius:3px;background:var(--paper);color:var(--ink-soft);cursor:pointer;"><option value="">+ add person…</option></select>
+        </div>
+      </div>
+      <div id="panel-split-section" style="display:none;padding:2px 0 8px 72px;">
+        <div id="panel-split-presets" style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:7px;"></div>
+        <div id="panel-split-rows"></div>
       </div>
     </div>
-    <div id="panel-split-section" style="display:none;padding:2px 0 8px 72px;">
-      <div id="panel-split-presets" style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:7px;"></div>
-      <div id="panel-split-rows"></div>
+    <div class="panel-body" id="pBody"></div>
+    <div class="panel-foot">
+      <div id="groceryFoot">
+        <div class="breakdown" id="fBreakdown"></div>
+        <div class="row"><span>Receipt total</span><span id="fTotal"></span></div>
+        <div class="row"><span>Claimed personally</span><span id="fClaimed"></span></div>
+        <div class="row total"><span>Pooled &amp; split by presence/diet</span><span id="fRemaining"></span></div>
+      </div>
+      <div id="restaurantFoot" style="display:none;">
+        <div class="row"><span>Total bill</span><span id="rfTotal"></span></div>
+        <div class="row total"><span id="rfSplitLabel">Split among 0 people</span><span id="rfSplitAmt"></span></div>
+      </div>
+      <button class="add-btn danger" id="deleteReceiptBtn" style="width:100%;margin-top:14px;">Delete receipt</button>
     </div>
-  </div>
-  <div class="panel-body" id="pBody"></div>
-  <div class="panel-foot">
-    <div id="groceryFoot">
-      <div class="breakdown" id="fBreakdown"></div>
-      <div class="row"><span>Receipt total</span><span id="fTotal"></span></div>
-      <div class="row"><span>Claimed personally</span><span id="fClaimed"></span></div>
-      <div class="row total"><span>Pooled &amp; split by presence/diet</span><span id="fRemaining"></span></div>
-    </div>
-    <div id="restaurantFoot" style="display:none;">
-      <div class="row"><span>Total bill</span><span id="rfTotal"></span></div>
-      <div class="row total"><span id="rfSplitLabel">Split among 0 people</span><span id="rfSplitAmt"></span></div>
-    </div>
-    <button class="add-btn danger" id="deleteReceiptBtn" style="width:100%;margin-top:14px;">Delete receipt</button>
   </div>
 </div>
 
