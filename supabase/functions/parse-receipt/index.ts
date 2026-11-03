@@ -148,9 +148,39 @@ Categories (assign exactly one — be precise):
 - "House Supplies" — cleaning products, hygiene, toiletries, household non-food (bags, dishwasher tabs, cat litter, socks, etc.)
 - "Consumables" — pantry staples: canned goods, pasta, rice, oil, spices, condiments, pulses (beans, chickpeas, lentils), tomatoes (canned/passata), sugar, flour`;
 
+const EMPTY_PARSE = { store: null, date: null, total: 0, items: [] };
+
 function extractJson(text: string) {
-  const m = text.match(/```(?:json)?\s*([\s\S]*?)```/) || text.match(/(\{[\s\S]*\})/);
-  return JSON.parse((m ? m[1] : text).trim());
+  try {
+    const m = text.match(/```(?:json)?\s*([\s\S]*?)```/) || text.match(/(\{[\s\S]*\})/);
+    return JSON.parse((m ? m[1] : text).trim());
+  } catch (_) {
+    // Response was not valid JSON (truncated or model added prose).
+    // Try to salvage a partial items array if present.
+    try {
+      const arrM = text.match(/"items"\s*:\s*(\[[\s\S]*)/);
+      if (arrM) {
+        // Find the last complete item object by trimming after the last complete }
+        const raw = arrM[1];
+        const lastClose = raw.lastIndexOf("},");
+        if (lastClose > 0) {
+          const partial = JSON.parse(raw.slice(0, lastClose + 1) + "]");
+          if (Array.isArray(partial) && partial.length > 0) {
+            const storeM = text.match(/"store"\s*:\s*"([^"]+)"/);
+            const dateM = text.match(/"date"\s*:\s*"(\d{4}-\d{2}-\d{2})"/);
+            const totalM = text.match(/"total"\s*:\s*([\d.]+)/);
+            return {
+              store: storeM ? storeM[1] : null,
+              date: dateM ? dateM[1] : null,
+              total: totalM ? parseFloat(totalM[1]) : 0,
+              items: partial,
+            };
+          }
+        }
+      }
+    } catch (_2) { /* ignore salvage failure */ }
+    return { ...EMPTY_PARSE };
+  }
 }
 
 function itemsSum(items: Array<{ qty: number; price: number }>): number {
@@ -192,7 +222,7 @@ Deno.serve(async (req) => {
     // ── First pass: full parse ────────────────────────────────────────────────
     const firstResp = await client.messages.create({
       model: "claude-haiku-5-5",
-      max_tokens: 2048,
+      max_tokens: 4096,
       system: systemContent as any,
       messages: [{
         role: "user",

@@ -1775,18 +1775,23 @@ document.getElementById("af-scan-btn").onclick=async()=>{
       r.date===scannedDate &&
       Math.abs(r.total-scannedTotal)<0.01
     );
-    st.className="scan-status done";
-    if(alreadyExists){
+    if(afItems.length===0 && afReceiptTotal===0){
+      st.className="scan-status"; st.style.color="var(--clay)";
+      st.textContent="Scan returned no items — receipt may be too long or unclear. Re-scan or enter items manually below.";
+    } else if(alreadyExists){
       st.className="scan-status";st.style.color="var(--amber,#d97706)";
       st.textContent=`⚠ This receipt looks like it was already scanned (same store, date & total). Check before saving.`;
     } else {
+      st.className="scan-status done";
       st.textContent=`Found ${afItems.length} items${note} — verify totals below and save.`;
     }
   } catch(err){
     st.className="scan-status"; st.style.color="var(--clay)";
     let msg=err?.message||(typeof err==="string"?err:null)||"Unknown error — please try again.";
-    if(msg.toLowerCase().includes("json")||msg.toLowerCase().includes("token")||msg.toLowerCase().includes("syntax"))
-      msg="Receipt photo may be sideways or unclear — retake it upright and well-lit, then re-scan.";
+    if(msg.toLowerCase().includes("sideways")||msg.toLowerCase().includes("rotate")||msg.toLowerCase().includes("portrait"))
+      msg="Receipt is sideways — rotate your phone upright and retake the photo.";
+    else if(msg.toLowerCase().includes("syntax")||msg.toLowerCase().includes("json")||msg.toLowerCase().includes("token")||msg.includes("500"))
+      msg="Couldn't read this receipt — it may be too long, low contrast, or complex. Re-scan or enter items manually.";
     st.textContent="Scan failed: "+msg;
   }
   btn.disabled=false; btn.textContent="Re-scan";
