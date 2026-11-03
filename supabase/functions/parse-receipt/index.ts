@@ -86,6 +86,38 @@ Other:
 - ROHRZUCKER / RÜBENZUCKER / KOKOSBLÜTENZUCKER → cane/beet/coconut sugar → Consumables
 - HAFERFLOCKEN / HAFER → oats → Consumables
 
+STANDARDIZED ENGLISH VOCABULARY — always use EXACTLY these English words. Never use synonyms, even if they seem equally correct. Consistency matters above naturalness:
+Meat / protein:
+- Geflügel / geflügel / gefluegel → "poultry" (NEVER "chicken" unless the receipt says Hähnchen/Hühnchen/Haehnchen — those specifically mean chicken)
+- Hähnchen / Hühnchen / Haehnchen / Huehnchen → "chicken"
+- Rindfleisch / Rind → "beef"
+- Schweinefleisch / Schwein → "pork"
+- Wiener (sausage context) → "wiener sausage" (keep "Wiener" as the product type, do NOT drop it)
+- Wurst → "sausage"
+- Schinken → "ham"
+- Speck → "bacon"
+Dairy:
+- gerieben / grated → "shredded" (e.g. "Shredded mozzarella", NOT "Grated mozzarella")
+- Weidebutter / Weidemilch → "pasture butter" / "pasture milk"
+- Süßrahmbutter / süßrahm → "sweet cream butter"
+- Sahne → "cream"
+- Schmand → "sour cream"
+- Quark → "quark"
+Confectionery / snacks:
+- Schoko / Schokolade → "chocolate"
+- Noisette → "hazelnut"
+- Vollmilch (in chocolate context) → "milk chocolate"
+- Zartbitter / dunkel (in chocolate context) → "dark chocolate"
+Fruit & veg:
+- Tomate / Tomaten → "tomato" / "tomatoes"
+- Basilikum → "basil"
+- Rote Bete / Rote Beete / Rüben → "beetroot"
+- Rohrzucker → "cane sugar"
+- Rübenzucker → "beet sugar"
+Packaging / preparation descriptors (standardize these too):
+- im Topf / en pot → "in pot" (e.g. "Basil in pot")
+- Bio / Bioland / Biol. → "organic" (use once at the start, do not repeat)
+
 KNOWN BRANDS — cross-reference brand name to override category guesses:
 - KIRPA / BIO KIRPA → Kirpa is a HERBAL TEA brand. EVERY Kirpa product is tea → "Drinks". CRITICAL: "Kirpa Gold Kurkuma" = golden turmeric tea (NOT curry powder, NOT snack). "Kirpa Halsliebe" = throat-soothing herbal tea. Never put Kirpa in Snacks or Consumables.
 - VOELKEL / VÖLKEL → organic juice / beverage brand → "Drinks"
