@@ -62,6 +62,16 @@ Meat & Protein:
 - RINDFLEISCH / RIND → beef (Meat)
 - PUTENBRUST → turkey breast (Meat)
 - LACHS → salmon (Meat)
+- KASSLER / KASSELER → smoked/cured pork chop or neck — category: Meat. CRITICAL: NOT dairy. The name sounds like "Käse" (cheese) but Kassler is a pork product.
+- LEBERKÄSE / LEBERKAESE / LEBERKASE → Bavarian meat loaf — category: Meat. CRITICAL: NOT dairy despite "Käse" in the name. Contains no cheese.
+- FLEISCHWURST → pork ring sausage (Meat)
+- SCHINKEN / SCHINKENWURST → ham / cooked ham sausage (Meat)
+- BRATWURST / BOCKWURST / WIENER / WEISSWURST / WEISSWURST → German sausage varieties (Meat)
+- SALAMI → salami (Meat)
+- HÄHNCHENBRUST / HAHNCHENBRUST / HÄHNCHENFILET → chicken breast / fillet (Meat)
+- GARNELEN / SHRIMPS → prawns / shrimp (Meat)
+- THUNFISCH → tuna (Meat)
+- HERING → herring (Meat)
 Dairy & Eggs:
 - BIO EIER / FREILANDEIER + month abbreviation (OKT, NOV etc.) → organic eggs, pack size from "2 Stk" etc. (Eggs)
 - QUARK → quark / curd cheese (Dairy)

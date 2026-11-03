@@ -596,7 +596,17 @@
     </label>
     <div class="scan-status" id="photoUploadStatus"></div>
     <div class="field-row" id="dateRow"><label>Date</label><input type="date" id="dateInput"></div>
-    <div class="field-row"><label>Paid by</label><select id="buyerSelect"></select></div>
+    <div class="field-row" style="align-items:flex-start;margin-bottom:4px;">
+      <label style="padding-top:4px;">Paid by</label>
+      <div style="flex:1;">
+        <div id="panel-payer-tags" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:5px;min-height:0;"></div>
+        <select id="panel-payer-select" style="width:100%;font-family:'IBM Plex Sans',sans-serif;font-size:12px;padding:6px 8px;border:1px dashed var(--line);border-radius:3px;background:var(--paper);color:var(--ink-soft);cursor:pointer;"><option value="">+ add person…</option></select>
+      </div>
+    </div>
+    <div id="panel-split-section" style="display:none;padding:2px 0 8px 72px;">
+      <div id="panel-split-presets" style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:7px;"></div>
+      <div id="panel-split-rows"></div>
+    </div>
   </div>
   <div class="panel-body" id="pBody"></div>
   <div class="panel-foot">
@@ -1229,19 +1239,11 @@ function openPanel(r){
   const di=document.getElementById("dateInput"); di.value=r.date||"";
   document.getElementById("dateRow").classList.toggle("needs-date",!r.date);
   di.onchange=async()=>{ r.date=di.value||null;document.getElementById("dateRow").classList.toggle("needs-date",!r.date);renderGrid();renderCalendar();updateFooter(r);await sbClient.from("receipts").update({date:r.date}).eq("id",r.id); };
-  const bs=document.getElementById("buyerSelect");
-  if(r.payers&&r.payers.length>1){
-    // Multi-payer: show read-only summary instead of single select
-    bs.style.display="none";
-    let pw=document.getElementById("panel-payers-wrap");
-    if(!pw){ pw=document.createElement("div");pw.id="panel-payers-wrap";pw.style.cssText="font-size:12px;margin-top:2px;";bs.parentNode.insertBefore(pw,bs); }
-    pw.innerHTML=r.payers.map(p=>`<div style="display:flex;justify-content:space-between;padding:2px 0;"><span>${memberName(p.member_id)||"?"}</span><span style="font-family:'IBM Plex Mono',monospace;">€${Number(p.amount).toFixed(2)}</span></div>`).join("");
-  } else {
-    bs.style.display="";
-    const pw=document.getElementById("panel-payers-wrap"); if(pw) pw.innerHTML="";
-    bs.innerHTML=`<option value="">— not yet claimed —</option>`+MEMBERS.map(m=>`<option value="${m.id}" ${r.buyer_id===m.id?"selected":""}>${m.name}</option>`).join("");
-    bs.onchange=async()=>{ r.buyer_id=bs.value||null;renderGrid();await sbClient.from("receipts").update({buyer_id:r.buyer_id}).eq("id",r.id); };
-  }
+  // Init panel payer state from receipt data, then render tag UI
+  if(r.payers&&r.payers.length>0){ panelPayers=r.payers.map(p=>({memberId:p.member_id,amount:Number(p.amount)})); }
+  else if(r.buyer_id){ panelPayers=[{memberId:r.buyer_id,amount:r.total}]; }
+  else{ panelPayers=[]; }
+  renderPanelPayers(r);
   document.getElementById("deleteReceiptBtn").onclick=async()=>{
     if(!confirm(`Delete #${shortId(r.id)} — ${r.store}? Can't be undone.`)) return;
     const{error}=await sbClient.from("receipts").delete().eq("id",r.id);
@@ -1904,6 +1906,96 @@ document.getElementById("af-payer-select").onchange=function(){
   renderAfPayers();
 };
 
+// ── Panel (edit) payer state + rendering ─────────────────────────────────────
+let panelPayers=[];
+
+async function savePanelPayers(r){
+  const active=panelPayers.filter(p=>p.memberId);
+  const buyerId=active.length>0?active[0].memberId:null;
+  const payers=active.length>1?active.map(p=>({member_id:p.memberId,amount:p.amount})):null;
+  r.buyer_id=buyerId; r.payers=payers;
+  renderGrid();
+  await sbClient.from("receipts").update({buyer_id:buyerId,payers}).eq("id",r.id);
+}
+
+function renderPanelPayers(r){
+  const tagsEl=document.getElementById("panel-payer-tags");
+  const selectEl=document.getElementById("panel-payer-select");
+  const splitSection=document.getElementById("panel-split-section");
+  const presetsEl=document.getElementById("panel-split-presets");
+  const rowsEl=document.getElementById("panel-split-rows");
+  if(!tagsEl||!selectEl) return;
+
+  const total=r.total;
+  const activePayers=panelPayers.filter(p=>p.memberId);
+  const selectedIds=new Set(activePayers.map(p=>p.memberId));
+
+  tagsEl.innerHTML="";
+  activePayers.forEach(p=>{
+    const m=MEMBERS.find(m=>m.id===p.memberId); if(!m) return;
+    const tag=document.createElement("span"); tag.className="payer-tag";
+    tag.innerHTML=`${m.name}<button type="button" class="rm-tag" aria-label="Remove ${m.name}">×</button>`;
+    tag.querySelector(".rm-tag").onclick=async()=>{ panelPayers=panelPayers.filter(p2=>p2.memberId!==p.memberId); await savePanelPayers(r); renderPanelPayers(r); };
+    tagsEl.appendChild(tag);
+  });
+
+  selectEl.innerHTML=`<option value="">+ add person…</option>`+MEMBERS.filter(m=>!selectedIds.has(m.id)).map(m=>`<option value="${m.id}">${m.name}</option>`).join("");
+  selectEl.style.display=selectedIds.size>=MEMBERS.length?"none":"";
+  selectEl.onchange=async function(){
+    const mid=this.value; if(!mid) return;
+    panelPayers=panelPayers.filter(p=>p.memberId);
+    panelPayers.push({memberId:mid,amount:0});
+    const n=panelPayers.length;
+    if(n>0){ const share=Math.round(total/n*100)/100; panelPayers.forEach((p,i)=>p.amount=i<n-1?share:Math.round((total-(share*(n-1)))*100)/100); }
+    this.value="";
+    await savePanelPayers(r);
+    renderPanelPayers(r);
+  };
+
+  if(activePayers.length===1){ activePayers[0].amount=Math.round(total*100)/100; }
+
+  if(activePayers.length>=2){
+    splitSection.style.display="";
+    const presets2=[["50 / 50",[50,50]],["25 / 75",[25,75]],["75 / 25",[75,25]],["33 / 67",[33.3,66.7]]];
+    const presets3=[["33 / 33 / 33",[33.3,33.3,33.4]]];
+    const presets=activePayers.length===2?presets2:activePayers.length===3?presets3:[];
+    presetsEl.innerHTML="";
+    presets.forEach(([label,pcts])=>{
+      const btn=document.createElement("button"); btn.type="button"; btn.className="split-preset"; btn.textContent=label;
+      btn.onclick=async()=>{
+        pcts.forEach((pct,i)=>{ if(activePayers[i]) activePayers[i].amount=Math.round(total*pct/100*100)/100; });
+        const sum=activePayers.reduce((s,p)=>s+p.amount,0);
+        const last=activePayers[activePayers.length-1];
+        last.amount=Math.round((last.amount+(total-sum))*100)/100;
+        await savePanelPayers(r); renderPanelPayers(r);
+      };
+      presetsEl.appendChild(btn);
+    });
+    rowsEl.innerHTML="";
+    activePayers.forEach(p=>{
+      const m=MEMBERS.find(m=>m.id===p.memberId); if(!m) return;
+      const pct=total>0?Math.round(p.amount/total*1000)/10:0;
+      const row=document.createElement("div"); row.className="split-row";
+      row.innerHTML=`<span style="font-size:12px;">${m.name}</span><div class="split-row-pct"><input type="number" min="0" max="100" step="0.1" value="${pct}"><span style="font-size:12px;color:var(--ink-soft);">%</span></div>`;
+      row.querySelector("input").onchange=async e=>{
+        const newPct=parseFloat(e.target.value)||0;
+        p.amount=Math.round(total*newPct/100*100)/100;
+        await savePanelPayers(r);
+        const allocated=activePayers.reduce((s,ap)=>s+ap.amount,0);
+        const remaining=Math.round((total-allocated)*100)/100;
+        let note=rowsEl.querySelector(".split-unallocated");
+        if(Math.abs(remaining)>0.005){ if(!note){note=document.createElement("div");note.className="split-unallocated";rowsEl.appendChild(note);} note.textContent=`€${remaining.toFixed(2)} unallocated`; } else if(note){ note.remove(); }
+      };
+      rowsEl.appendChild(row);
+    });
+    const allocated=activePayers.reduce((s,p)=>s+p.amount,0);
+    const remaining=Math.round((total-allocated)*100)/100;
+    if(Math.abs(remaining)>0.005){ const note=document.createElement("div");note.className="split-unallocated";note.textContent=`€${remaining.toFixed(2)} unallocated`;rowsEl.appendChild(note); }
+  } else {
+    splitSection.style.display="none";
+  }
+}
+
 function afRenderItems(){
   const wrap=document.getElementById("af-items");wrap.innerHTML="";
   afItems.forEach((it,idx)=>{
@@ -2139,7 +2231,8 @@ async function routeAfterAuth(){
   // 4. Listen for auth state changes (token refresh, sign-out)
   sbClient.auth.onAuthStateChange(async (event, session) => {
     if(event === "SIGNED_OUT"){ currentUser=null;currentSub=null;currentTripId=null;showScreen("screen-auth"); }
-    if(event === "SIGNED_IN" && session){ currentUser=session.user;await routeAfterAuth(); }
+    // TOKEN_REFRESHED fires SIGNED_IN — don't navigate if already inside a trip
+    if(event === "SIGNED_IN" && session){ currentUser=session.user; if(!currentTripId) await routeAfterAuth(); }
   });
 })();
 </script>
