@@ -246,7 +246,7 @@ Deno.serve(async (req) => {
       }],
     });
 
-    const firstText = firstResp.content[0].type === "text" ? firstResp.content[0].text : "";
+    const firstText = (firstResp.content.find((b: { type: string }) => b.type === "text") as { type: string; text: string } | undefined)?.text ?? "";
     console.log("parse-receipt model response (first 2000 chars):", firstText.slice(0, 2000));
     const parsed = extractJson(firstText);
     const receiptTotal = parsed.total ? Math.round(Number(parsed.total) * 100) / 100 : 0;
@@ -291,7 +291,7 @@ Otherwise return ONLY a JSON array (no wrapper object):
         }],
       });
 
-      const secondText = secondResp.content[0].type === "text" ? secondResp.content[0].text : "";
+      const secondText = (secondResp.content.find((b: { type: string }) => b.type === "text") as { type: string; text: string } | undefined)?.text ?? "";
       try {
         // Extract either a bare array or the items field from an object
         const arrMatch = secondText.match(/\[[\s\S]*\]/);
